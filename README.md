@@ -419,3 +419,5 @@ For issues or questions:
 ---
 
 **Built with ❤️ for the 2026 Capstone Project**
+#   S m a r t - m e t e r  
+ 
