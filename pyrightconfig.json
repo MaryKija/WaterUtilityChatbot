@@ -1,0 +1,16 @@
+{
+  "include": [
+    "api/",
+    "backend/"
+  ],
+  "exclude": [
+    "frontend/",
+    "tests/",
+    "__pycache__/",
+    "node_modules/"
+  ],
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false
+}

@@ -1,0 +1,56 @@
+# Vercel deployment ignore file
+# Exclude development and unnecessary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+pytest.ini
+pytest_output.txt
+tests/
+logs/
+screenshots/
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend build artifacts (will be built by Vercel)
+frontend/*/node_modules/
+frontend/*/dist/
+frontend/*/build/
+
+# Python cache
+backend/__pycache__/
+backend/*/__pycache__/
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

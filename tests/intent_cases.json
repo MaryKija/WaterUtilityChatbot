@@ -1,0 +1,124 @@
+{
+  "test_cases": [
+    {
+      "id": 1,
+      "message": "Why is my water brown?",
+      "expected_intent": "water_quality_issue",
+      "category": "water_issues"
+    },
+    {
+      "id": 2,
+      "message": "No water coming out of my tap",
+      "expected_intent": "no_water_supply",
+      "category": "water_issues"
+    },
+    {
+      "id": 3,
+      "message": "Water pressure is very low",
+      "expected_intent": "low_water_pressure",
+      "category": "water_issues"
+    },
+    {
+      "id": 4,
+      "message": "There's a leak in my pipe",
+      "expected_intent": "pipe_leak_report",
+      "category": "water_issues"
+    },
+    {
+      "id": 5,
+      "message": "My pipe burst and water is gushing everywhere",
+      "expected_intent": "burst_pipe_emergency",
+      "category": "water_issues"
+    },
+    {
+      "id": 6,
+      "message": "How much do I owe?",
+      "expected_intent": "billing_inquiry",
+      "category": "billing"
+    },
+    {
+      "id": 7,
+      "message": "My bill is too high",
+      "expected_intent": "high_bill_complaint",
+      "category": "billing"
+    },
+    {
+      "id": 8,
+      "message": "I didn't receive my bill",
+      "expected_intent": "bill_not_received",
+      "category": "billing"
+    },
+    {
+      "id": 9,
+      "message": "These charges are wrong",
+      "expected_intent": "billing_dispute",
+      "category": "billing"
+    },
+    {
+      "id": 10,
+      "message": "How can I pay my bill?",
+      "expected_intent": "payment_methods_info",
+      "category": "billing"
+    },
+    {
+      "id": 11,
+      "message": "I want a new water connection",
+      "expected_intent": "new_connection_request",
+      "category": "connections"
+    },
+    {
+      "id": 12,
+      "message": "What's the status of my connection?",
+      "expected_intent": "connection_status_check",
+      "category": "connections"
+    },
+    {
+      "id": 13,
+      "message": "Where is your office?",
+      "expected_intent": "office_location_hours",
+      "category": "info"
+    },
+    {
+      "id": 14,
+      "message": "What are your working hours?",
+      "expected_intent": "office_location_hours",
+      "category": "info"
+    },
+    {
+      "id": 15,
+      "message": "Check my complaint status WC-A1B2C3",
+      "expected_intent": "complaint_followup",
+      "category": "tracking"
+    },
+    {
+      "id": 16,
+      "message": "I need to speak to someone",
+      "expected_intent": "human_escalation",
+      "category": "escalation"
+    },
+    {
+      "id": 17,
+      "message": "Is there a water outage in my area?",
+      "expected_intent": "check_water_outage",
+      "category": "info"
+    },
+    {
+      "id": 18,
+      "message": "I want to report a water problem",
+      "expected_intent": "report_water_fault",
+      "category": "water_issues"
+    },
+    {
+      "id": 19,
+      "message": "Help me",
+      "expected_intent": "general_faq",
+      "category": "help"
+    },
+    {
+      "id": 20,
+      "message": "What can you do?",
+      "expected_intent": "general_faq",
+      "category": "help"
+    }
+  ]
+}

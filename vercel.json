@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/aqua-chat-modern-main/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/chat.py",
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.11"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/chat.py"
+    },
+    {
+      "src": "/admin/(.*)",
+      "dest": "/frontend/admin/dist/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/aqua-chat-modern-main/dist/$1"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "."
+  }
+}

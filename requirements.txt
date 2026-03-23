@@ -1,0 +1,14 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+requests>=2.31
+python-dotenv>=1.0
+mangum>=0.17  # For Vercel serverless functions
+
+# Intent discovery (local-first, with graceful fallback if some are missing)
+scikit-learn>=1.4
+sentence-transformers>=2.6
+hdbscan>=0.8
+umap-learn>=0.5
+
+# Optional: fast nearest neighbors (not required for fallback)
+faiss-cpu>=1.8
