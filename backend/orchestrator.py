@@ -1,3 +1,4 @@
+
 """backend/orchestrator.py
 
 Orchestrator for handling conversation requests.
@@ -12,13 +13,16 @@ Coordinates:
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
+from datetime import datetime
 
 from .agent import run_agent
-from .context_engine import context_manager
+from .context_engine import context_manager, extract_entities
 from .intent_pipeline import intent_pipeline
 from .logger import logger
 from .tool_executor import tool_executor
+from .validators import is_valid_name
 
 
 class Orchestrator:
@@ -39,25 +43,59 @@ class Orchestrator:
         # Load context
         context = context_manager.load_context(user_id)
 
+        # Clear context when user explicitly asks to reset
+        command = message.strip().lower()
+        if command in ("clear", "reset", "start over", "new conversation", "restart"):
+            context = context_manager.reset_context(context)
+            context_manager.save_context(user_id, context)
+            return {
+                "reply": "Conversation reset. How can I help you today?",
+                "intent": None,
+                "confidence": 1.0,
+                "entities": {},
+                "active_agent": None,
+                "escalated": False,
+            }
+
         # Update context with user message
         context = context_manager.update_context_with_history(context, "user", message)
 
-        # Decide next action
-        if context_manager.should_continue_workflow(context):
-            # Continue existing workflow
-            agent_name = context.get("active_agent", "general_agent")
+
+        extracted = extract_entities(message)
+        if extracted:
+            entities = context.get("entities", {})
+            entities.update(extracted)
+            context["entities"] = entities
+            logger.info(f"Extracted entities: {extracted}")
+
+        # Clear context when user explicitly asks to reset
+        command = message.strip().lower()
+        if command in ("clear", "reset", "start over", "new conversation", "restart"):
+            context = context_manager.reset_context(context)
+            context_manager.save_context(user_id, context)
+            return {
+                "reply": "Conversation reset. How can I help you today?",
+                "intent": None,
+                "confidence": 1.0,
+                "entities": {},
+                "active_agent": None,
+                "escalated": False,
+            }
+
+        # FLOW LOCK: If active_agent AND flow_started, BYPASS classification
+        if (context.get("active_agent") and context.get("flow_started", False)):
+            logger.info(f"Flow locked: {context['active_agent']}")
+            agent_name = context["active_agent"]
             agent = self.agents.get(agent_name, self.agents["general_agent"])
-
             response = self._handle_with_agent(agent, message, context)
-
         elif context_manager.should_classify_intent(context):
-            # Run intent classification
+            # Classify + route
             intent_result = intent_pipeline.classify(message, context)
-
-            # Update context with intent
+            logger.info(f"Classified: {intent_result['intent']} ({intent_result['confidence']:.2f})")
+            
             context = context_manager.update_context_with_intent(context, intent_result)
-
-            # Check for escalation
+            
+            # Check escalation first
             if context_manager.should_escalate(context, intent_result.get("confidence", 0), 0):
                 context = context_manager.escalate_context(context, "low_confidence")
                 agent = self.agents["human_agent"]
@@ -66,12 +104,9 @@ class Orchestrator:
                 agent = self.agents.get(agent_name, self.agents["general_agent"])
 
             response = self._handle_with_agent(agent, message, context)
-
         else:
-            # Default to general agent
             agent = self.agents["general_agent"]
             response = self._handle_with_agent(agent, message, context)
-
         # Update context with bot response
         context = context_manager.update_context_with_history(context, "bot", response)
 
@@ -123,75 +158,173 @@ class BaseAgent:
 class ComplaintAgent(BaseAgent):
     """Agent for handling complaints."""
 
-    def handle(self, message: str, context: dict) -> dict:
-        entities = context.get("entities", {})
-        step = context.get("step")
+    _COMPLAINT_FIELDS = ("name", "area", "issue")
+    _NAME_STOPWORDS = {
+        "account",
+        "address",
+        "agent",
+        "area",
+        "bill",
+        "complaint",
+        "experiencing",
+        "hello",
+        "help",
+        "hi",
+        "issue",
+        "leak",
+        "meter",
+        "name",
+        "outage",
+        "please",
+        "pressure",
+        "problem",
+        "report",
+        "road",
+        "service",
+        "still",
+        "street",
+        "supply",
+        "the",
+        "water",
+    }
 
-        if not entities.get("name"):
+    def _capture_step_reply(self, message: str, context: dict, entities: dict) -> None:
+        """Capture direct replies for the field we are actively collecting."""
+        step = str(context.get("step") or "")
+        raw = (message or "").strip()
+        if not raw:
+            return
+
+        if not entities.get("name") and step == "collect_name":
+            maybe_name = self._extract_name_reply(raw)
+            if maybe_name:
+                entities["name"] = maybe_name
+
+        if not entities.get("area"):
+            if entities.get("address"):
+                entities["area"] = entities["address"]
+            elif step == "collect_area":
+                entities["area"] = raw
+
+        if not entities.get("issue"):
+            inferred_issue = self._infer_issue(raw, context)
+            if inferred_issue:
+                entities["issue"] = inferred_issue
+            elif step == "collect_issue":
+                entities["issue"] = raw
+
+    def _extract_name_reply(self, raw: str) -> Optional[str]:
+        if any(ch.isdigit() for ch in raw):
+            return None
+
+        explicit_match = re.search(
+            r"(?:my\s+name\s+is|i\s+am|i'm|name\s*[:=-]?)\s*([A-Za-z][A-Za-z\s'\-\.]{1,58})$",
+            raw,
+            flags=re.IGNORECASE,
+        )
+        candidate = explicit_match.group(1).strip() if explicit_match else raw.strip()
+        tokens = re.findall(r"[A-Za-z][A-Za-z'\-\.]*", candidate)
+        if not 2 <= len(tokens) <= 4:
+            return None
+        if any(token.lower() in self._NAME_STOPWORDS for token in tokens):
+            return None
+
+        normalized = " ".join(tokens)
+        return normalized if is_valid_name(normalized) else None
+
+    def _infer_issue(self, message: str, context: dict) -> Optional[str]:
+        lowered = (message or "").lower()
+        intent = str(context.get("intent") or "")
+
+        if "leak" in lowered:
+            return "Water leak"
+        if "outage" in lowered or "no water" in lowered or "no supply" in lowered:
+            return "Water outage"
+        if "low pressure" in lowered:
+            return "Low water pressure"
+        if "burst" in lowered or "pipe" in lowered:
+            return "Pipe fault"
+        if intent == "leak_report":
+            return "Water leak"
+        return None
+
+    def handle(self, message: str, context: dict) -> dict:
+        entities = context.setdefault("entities", {})
+        self._capture_step_reply(message, context, entities)
+
+        current_field = next((field for field in self._COMPLAINT_FIELDS if not entities.get(field)), None)
+
+        if current_field == "name":
             context_manager.update_context_with_step(context, "collect_name")
             return {
                 "reply": "I can help report this issue. Please provide your full name.",
                 "requires_tool": False
             }
 
-        if not entities.get("area"):
+        if current_field == "area":
             context_manager.update_context_with_step(context, "collect_area")
             return {
-                "reply": "Please provide the area where the issue is occurring.",
+                "reply": "Please provide the area or address where the issue is occurring (e.g., 'Mulungushi Road House 434').",
                 "requires_tool": False
             }
 
-        if not entities.get("issue"):
+        if current_field == "issue":
             context_manager.update_context_with_step(context, "collect_issue")
             return {
-                "reply": "Please describe the issue you're experiencing.",
+                "reply": "Please describe the water issue (no water, low pressure, leak, etc.).",
                 "requires_tool": False
             }
 
-        # All info collected, log complaint
+        # All info collected or meter provided, log complaint
         context_manager.update_context_with_step(context, "log_complaint")
         return {
-            "reply": "Logging your complaint...",
+            "reply": "Logging your complaint now...",
             "requires_tool": True,
             "tool_name": "log_complaint",
             "parameters": {
-                "name": entities["name"],
-                "area": entities["area"],
-                "issue": entities["issue"]
+                "name": entities.get("name", "Customer"),
+                "area": entities.get("area", "Unknown"),
+                "issue": entities.get("issue", "Water supply issue"),
+                "meter_number": entities.get("meter_number", entities.get("account_number"))
             }
         }
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        # Tool result is the complaint response
-        context_manager.reset_context(context)  # End workflow
-        return {"reply": tool_result}
+        context_manager.reset_context(context)
+        return {"reply": tool_result or "Your complaint WC-XXXXXX has been logged. Our team will investigate within 24 hours."}
 
 
 class BillingAgent(BaseAgent):
-    """Agent for handling billing inquiries."""
+    """Agent for handling billing inquiries - integrated with agent.py logic."""
 
     def handle(self, message: str, context: dict) -> dict:
-        entities = context.get("entities", {})
+        from .agent import run_agent
+        from .intent_pipeline import intent_pipeline
+        from .context_engine import extract_entities
 
-        if not entities.get("account_number"):
-            context_manager.update_context_with_step(context, "collect_account")
-            return {
-                "reply": "Please provide your account number to check your billing information.",
-                "requires_tool": False
-            }
-
-        # Get bill information
-        context_manager.update_context_with_step(context, "get_bill")
-        return {
-            "reply": "Checking your bill...",
-            "requires_tool": True,
-            "tool_name": "get_bill",
-            "parameters": {"account_number": entities["account_number"]}
+        # Extract intent (billing_inquiry)
+        intent_data = {
+            "intent": "billing_inquiry",
+            "confidence": 0.95,
+            "entities": extract_entities(message)
         }
+        
+        # Merge with context entities
+        entities = context.get("entities", {})
+        entities.update(intent_data["entities"])
+        context["entities"] = entities
+
+        # Use proven agent.py billing logic
+        reply = run_agent(message, intent_data, context)
+
+        # Save updated context (agent.py may update session)
+        from .context_engine import context_manager
+        context_manager.save_context(context.get("user_id", "unknown"), context)
+
+        return {"reply": reply, "requires_tool": False}
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        context_manager.reset_context(context)  # End workflow
-        return {"reply": tool_result}
+        return {"reply": tool_result or "Billing check complete."}
 
 
 class ConnectionAgent(BaseAgent):
@@ -199,7 +332,8 @@ class ConnectionAgent(BaseAgent):
 
     def handle(self, message: str, context: dict) -> dict:
         entities = context.get("entities", {})
-        step = context.get("step", 0)
+        step_str = str(context.get("step", "0"))
+        step = int(step_str)
 
         required_fields = ["name", "address", "phone", "email"]
         current_field = required_fields[step] if step < len(required_fields) else None
@@ -207,11 +341,11 @@ class ConnectionAgent(BaseAgent):
         if current_field and not entities.get(current_field):
             prompts = {
                 "name": "Please provide your full name.",
-                "address": "Please provide your full address.",
+                "address": "Please provide your full address where connection is needed.",
                 "phone": "Please provide your phone number.",
-                "email": "Please provide your email address."
+                "email": "Please provide your email (optional)."
             }
-            context_manager.update_context_with_step(context, step + 1)
+            context_manager.update_context_with_step(context, str(step + 1))
             return {
                 "reply": prompts[current_field],
                 "requires_tool": False
@@ -220,14 +354,14 @@ class ConnectionAgent(BaseAgent):
         # All fields collected, create connection request
         context_manager.update_context_with_step(context, "create_connection")
         return {
-            "reply": "Creating your connection request...",
+            "reply": "Processing your new connection request...",
             "requires_tool": True,
             "tool_name": "create_connection_request",
             "parameters": entities
         }
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        context_manager.reset_context(context)  # End workflow
+        context_manager.reset_context(context)
         return {"reply": tool_result}
 
 
@@ -243,7 +377,7 @@ class InfoAgent(BaseAgent):
         }
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        context_manager.reset_context(context)  # End workflow
+        context_manager.reset_context(context)
         return {"reply": tool_result}
 
 
@@ -260,11 +394,10 @@ class GeneralAgent(BaseAgent):
             max_tokens=140
         )
 
-        context_manager.reset_context(context)  # End workflow
+        context_manager.reset_context(context)
         return {"reply": response}
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        # Should not reach here for general agent
         return {"reply": "I apologize, but I encountered an error."}
 
 
@@ -273,14 +406,14 @@ class HumanAgent(BaseAgent):
 
     def handle(self, message: str, context: dict) -> dict:
         return {
-            "reply": "Your message has been sent to a customer service agent. They will assist you shortly.",
+            "reply": "Your message has been sent to customer service. They will respond shortly.",
             "requires_tool": False
         }
 
     def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        # Should not reach here for human agent
-        return {"reply": "Your message has been sent to a customer service agent."}
+        return {"reply": "Your message has been sent to customer service."}
 
 
 # Global orchestrator instance
 orchestrator = Orchestrator()
+

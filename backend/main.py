@@ -27,7 +27,7 @@ from .storage import (
     log_conversation_turn as storage_log_conversation_turn,
 )
 
-from .context_engine import context_redact_pii
+from .context_engine import context_redact_pii, context_manager
 
 
 def _require_admin(authorization: str | None) -> None:
@@ -101,7 +101,7 @@ async def serve_frontend(full_path: str):
         raise HTTPException(status_code=404, detail="Not found")
 
     # Check if it's an admin route
-    if full_path.startswith("admin") or "admin" in full_path:
+    if full_path == "admin" or full_path == "admin/":
         admin_path = Path(__file__).parent.parent / "frontend" / "admin" / "dist"
         index_file = admin_path / "index.html"
         if index_file.exists():
@@ -126,6 +126,11 @@ class ChatRequest(BaseModel):
     phone: Optional[str] = None
     user_id: Optional[str] = None
     message: str
+
+
+class ClearChatRequest(BaseModel):
+    phone: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 # ---------------------------
@@ -191,6 +196,22 @@ def chat(data: ChatRequest):
         "escalation_reason": None,  # Will be added to context later
         "active_agent": result.get("active_agent"),
     }
+
+
+@app.post("/chat/clear")
+def clear_chat(data: ClearChatRequest):
+    """Clear a user's session context for a fresh conversation."""
+    user_id = data.phone or data.user_id or "demo-user"
+    context = context_manager.reset_context({"user_id": user_id})
+    context_manager.save_context(user_id, context)
+
+    # Backward compatibility: clear legacy in-memory session cache as well.
+    try:
+        sessions.pop(user_id, None)
+    except Exception:
+        pass
+
+    return {"status": "cleared"}
 
 
 @app.get("/chat/updates")

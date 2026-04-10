@@ -202,12 +202,21 @@ def _fill_complaint_fields_from_message(message: str, session: dict) -> dict:
     return session
 
 
-def run_agent(message: str, intent_data: dict, session: dict) -> str:
+def run_agent(message: str, intent_data: dict, context: dict) -> str:
+    """Updated to use context (entities persisted)"""
+    session = context
     routed_intent = str(intent_data.get("intent", "out_of_scope"))
     confidence = float(intent_data.get("confidence", 0.0))
     auto_escalated = bool(intent_data.get("auto_escalated", False))
     original_intent = str(intent_data.get("original_intent") or routed_intent)
-    entities = intent_data.get("entities", {}) or {}
+    entities = context.get("entities", intent_data.get("entities", {}))
+    
+    from .validators import extract_account_number  # Always available
+
+    # REUSE EXISTING account_number FIRST
+    acct = context.get("entities", {}).get("account_number") or extract_account_number(message)
+    if acct:
+        logger.info(f"Account found from context/msg: {acct}")
 
     if routed_intent not in ALLOWED_INTENTS_SET:
         logger.warning(f"Invalid routed intent from classifier: {routed_intent!r}. Forcing out_of_scope")
@@ -215,10 +224,10 @@ def run_agent(message: str, intent_data: dict, session: dict) -> str:
 
     # Required log format for verification
     logger.info(
-        f"Intent={original_intent} confidence={confidence:.2f} routed_intent={routed_intent} auto_escalated={auto_escalated}"
+        f"Intent={original_intent} confidence={confidence:.2f} routed_intent={routed_intent} auto_escalated={auto_escalated} acct={acct}"
     )
 
-    flow = session.get("flow")
+    flow = context.get("flow")
 
     def _escalation_include_account_number() -> bool:
         """Only request account number when it is relevant (billing/payment flows)."""
@@ -477,8 +486,10 @@ def run_agent(message: str, intent_data: dict, session: dict) -> str:
             return "Please provide your account number (e.g., 123456 or account_number: 123456)."
 
         result = get_bill(acct)
+        session["account_number"] = acct  # Persist for payments
         session.clear()
-        return result
+        payment_methods = get_payment_methods()
+        return result + f"\n\n{payment_methods}"
 
     # =====================================================
     # New connection request (deterministic flow)

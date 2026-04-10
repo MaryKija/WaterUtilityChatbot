@@ -19,7 +19,8 @@ class Config:
         # Load .env file
         env_path = Path(__file__).resolve().parent.parent / ".env"
         # Override existing process env vars so edits to .env take effect on reload.
-        load_dotenv(dotenv_path=env_path, override=True)
+        # Use utf-8-sig to tolerate BOM markers (common with Windows editors).
+        load_dotenv(dotenv_path=env_path, override=True, encoding="utf-8-sig")
 
         # Groq
         self.groq_api_key = os.getenv("GROQ_API_KEY")

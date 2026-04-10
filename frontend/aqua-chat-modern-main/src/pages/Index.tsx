@@ -6,7 +6,7 @@ import TypingIndicator from "@/components/TypingIndicator";
 import ChatInput from "@/components/ChatInput";
 import WelcomeHero from "@/components/WelcomeHero";
 import type { ChatMessage } from "@/types/chat";
-import { sendMessage, getChatUpdates } from "@/services/api";
+import { sendMessage, getChatUpdates, clearChat } from "@/services/api";
 import { Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -137,10 +137,18 @@ const Index = () => {
     })();
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
+    try {
+      await clearChat(USER_ID);
+    } catch {
+      // If clearing fails, still reset local UI state.
+    }
+
     setMessages([WELCOME_MESSAGE]);
     setIntent("-");
     setConfidence("");
+    setIsEscalated(false);
+    setUpdatesAfter(0);
   };
 
   return (

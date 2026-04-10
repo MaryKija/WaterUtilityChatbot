@@ -4,23 +4,21 @@ import Escalations from "./pages/Escalations";
 import EscalationChat from "./pages/EscalationChat";
 import Complaints from "./pages/Complaints";
 import ComplaintDetail from "./pages/ComplaintDetail";
+import "./App.css";
 
-const linkStyle = ({ isActive }: { isActive: boolean }) => ({
-  padding: "8px 10px",
-  borderRadius: 10,
+const linkStyle = {
+  color: "inherit",
   textDecoration: "none",
-  border: "1px solid #e2e8f0",
-  background: isActive ? "#e0f2fe" : "#fff",
-});
+};
 
 export default function App() {
   return (
     <div>
-      <div style={{ borderBottom: "1px solid #e2e8f0", background: "white" }}>
-        <div className="container" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ fontWeight: 800 }}>Water Utility Admin</div>
-          <div style={{ flex: 1 }} />
-          <nav style={{ display: "flex", gap: 10 }}>
+      <div className="navbar">
+        <div className="container navbar-content">
+          <div className="navbar-title">Water Utility Admin</div>
+          <div className="navbar-spacer" />
+          <nav className="navbar-nav">
             <NavLink to="/" style={linkStyle} end>
               Dashboard
             </NavLink>

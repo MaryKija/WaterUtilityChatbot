@@ -3,6 +3,7 @@ uvicorn[standard]>=0.27
 requests>=2.31
 python-dotenv>=1.0
 mangum>=0.17  # For Vercel serverless functions
+pytest>=8.0
 
 # Intent discovery (local-first, with graceful fallback if some are missing)
 scikit-learn>=1.4

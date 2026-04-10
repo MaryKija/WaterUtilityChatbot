@@ -10,6 +10,7 @@ Handles:
 
 from __future__ import annotations
 
+import inspect
 import json
 from typing import Any, Dict, Optional
 
@@ -129,7 +130,7 @@ class ToolExecutor:
 
             # Execute tool
             function = tool_info["function"]
-            result = function(**parameters)
+            result = self._call_tool(function, parameters)
 
             # Update context if needed
             self._update_context_after_execution(tool_name, parameters, result, context)
@@ -140,6 +141,29 @@ class ToolExecutor:
         except Exception as e:
             logger.error(f"Tool execution failed: {tool_name}, error: {e}")
             return f"Error executing {tool_name}: {str(e)}"
+
+    def _call_tool(self, function, parameters: dict) -> Any:
+        """Call tools that accept either keyword args or a single payload dict."""
+        signature = inspect.signature(function)
+        params = list(signature.parameters.values())
+
+        accepts_var_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+        if accepts_var_kwargs:
+            return function(**parameters)
+
+        positional_params = [
+            p for p in params
+            if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        keyword_only_params = [
+            p for p in params
+            if p.kind == inspect.Parameter.KEYWORD_ONLY
+        ]
+
+        if len(positional_params) == 1 and not keyword_only_params:
+            return function(parameters)
+
+        return function(**parameters)
 
     def _validate_parameters(self, parameters: dict, schema: dict):
         """Validate parameters against schema."""

@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sqlite3
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Literal, Optional, Tuple
 
@@ -119,7 +120,7 @@ class ContextManager:
             "session_id": None,  # str
             "active_agent": None,  # str
             "intent": None,  # str
-            "step": None,  # str or int
+            "step": 0,  # str or int
             "entities": {},  # dict
             "history": [],  # list of dicts
             "last_updated": None,  # str (ISO)
@@ -129,10 +130,14 @@ class ContextManager:
             "intent_source": None,  # str - 'rule', 'lightweight', 'llm', 'arbitration'
         }
 
+    def _new_context_shell(self) -> dict:
+        """Return a fresh context dict without shared mutable defaults."""
+        return deepcopy(self.context_schema)
+
     def initialize_context(self, user_id: str) -> dict:
         """Initialize default context for a user."""
         uid = (user_id or "").strip() or "unknown"
-        context = self.context_schema.copy()
+        context = self._new_context_shell()
         context.update({
             "session_id": uid,
             "user_id": uid,
@@ -148,7 +153,7 @@ class ContextManager:
             return self.initialize_context(user_id)
 
         # Ensure all required fields exist
-        context = self.context_schema.copy()
+        context = self._new_context_shell()
         context.update(ctx)
         return context
 
@@ -204,13 +209,16 @@ class ContextManager:
         # Set active agent based on intent
         context["active_agent"] = self._map_intent_to_agent(context["intent"])
 
-        # Mark flow as started once we have an intent and agent
-        if context["intent"] and context["active_agent"]:
+        # Mark flow as started for service intents (not general_chat/out_of_scope)
+        service_intents = ["report_fault", "leak_report", "billing_inquiry", "new_connection", "complaint_followup", "meter_problem"]
+        if (context["intent"] and context["active_agent"] and 
+            context["intent"] in service_intents):
             context["flow_started"] = True
 
         return context
 
-    def update_context_with_step(self, context: dict, step: str, entities: dict = None) -> dict:
+
+    def update_context_with_step(self, context: dict, step: str | int, entities: dict = None) -> dict:
         """Update context with workflow step progress."""
         context["step"] = step
 
@@ -246,15 +254,26 @@ class ContextManager:
 
     def reset_context(self, context: dict) -> dict:
         """Reset context for new conversation."""
-        context.update({
+        # Fully reinitialize context to avoid keeping stale fields from prior sessions.
+        user_id = (context.get("user_id") or context.get("session_id") or "unknown").strip() or "unknown"
+        fresh_context = self.initialize_context(user_id)
+        fresh_context.update({
             "active_agent": None,
             "intent": None,
             "step": None,
+            "entities": {},
+            "history": [],
             "flow_started": False,
             "escalated": False,
             "confidence": None,
             "intent_source": None,
+            "pending_question": None,
+            "pending_attempts": {},
+            "conversation_summary": "",
+            "last_updated": _utc_now_iso(),
         })
+        context.clear()
+        context.update(fresh_context)
         return context
 
     def _map_intent_to_agent(self, intent: str) -> str:
@@ -277,7 +296,9 @@ class ContextManager:
     def expire_flow_if_needed(self, context: dict) -> dict:
         """Expire active flow if last_updated is beyond timeout."""
         last_updated = _parse_ts(context.get("last_updated"))
-        if not context.get("flow_started") or not last_updated:
+        if not context.get("flow_started") and not context.get("flow"):
+            return context
+        if not last_updated:
             return context
 
         timeout = timedelta(hours=max(1, FLOW_TIMEOUT_HOURS))
@@ -289,7 +310,10 @@ class ContextManager:
             "session_id": context.get("session_id"),
             "timeout_hours": FLOW_TIMEOUT_HOURS,
         })
-        return self.reset_context(context)
+        context = self.reset_context(context)
+        context["flow"] = None
+        context["flow_expired_notice"] = True
+        return context
 
 
 # Global context manager instance
@@ -461,10 +485,17 @@ def extract_entities(message: str) -> dict:
     msg = (message or "").strip()
     out: dict[str, str] = {}
 
-    # Account number: 6+ digits.
-    m_acct = re.search(r"\b(\d{6,20})\b", msg)
-    if m_acct and is_valid_account(m_acct.group(1)):
-        out["account_number"] = m_acct.group(1)
+    # Meter/Account number: 6+ digits (handles meter_number)
+    m_meter = re.search(r"\b(meter|account)[:\s]*(\d{6,12})\b", msg, re.IGNORECASE)
+    if m_meter:
+        out["meter_number"] = m_meter.group(2)
+        out["account_number"] = m_meter.group(2)
+    else:
+        m_acct = re.search(r"\b(\d{6,20})\b", msg)
+        if m_acct and is_valid_account(m_acct.group(1)):
+            out["account_number"] = m_acct.group(1)
+            out["meter_number"] = m_acct.group(1)
+
 
     # Ticket id: WC-XXXXXX
     m_tid = re.search(r"\b(WC-[A-Z0-9]{6})\b", msg.upper())
@@ -493,11 +524,17 @@ def extract_entities(message: str) -> dict:
         out["date"] = m_date.group(1)
 
     # Name: best-effort when explicitly stated.
-    m_name = re.search(r"\b(?:my\s+name\s+is|i\s+am)\s+([A-Za-z][A-Za-z\s'\-\.]{1,58})\b", msg, flags=re.IGNORECASE)
+    m_name = re.search(r"\b(?:my\s+name\s+is|i\s+am|name[ :-])\s*([A-Za-z][A-Za-z\s'\-\.]{1,58})\b", msg, flags=re.IGNORECASE)
     if m_name:
         name = m_name.group(1).strip()
         if is_valid_name(name):
             out["name"] = name
+
+    # Address: best-effort
+    m_addr = re.search(r"\b(?:address[ :-]|addr[ :-])\s*([A-Za-z0-9][A-Za-z0-9\s,.-]{2,100})\b", msg, flags=re.IGNORECASE)
+    if m_addr:
+        addr = m_addr.group(1).strip()
+        out["address"] = addr
 
     return out
 
@@ -641,3 +678,7 @@ def clear_workflow_for_ticket(ticket_id: str) -> int:
         extra={"extra_data": {"ticket_id": tid, "affected": affected}},
     )
     return affected
+
+
+def expire_flow_if_needed(context: dict) -> dict:
+    return context_manager.expire_flow_if_needed(context)

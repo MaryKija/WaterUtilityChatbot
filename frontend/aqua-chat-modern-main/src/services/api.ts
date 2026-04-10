@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = "/api";
 
 export async function sendMessage(message: string) {
   const response = await fetch(`${API_URL}/chat`, {
@@ -10,6 +10,23 @@ export async function sendMessage(message: string) {
       message: message,
       user_id: "demo-user",
     }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Backend error (${response.status}): ${detail || response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function clearChat(userId: string = "demo-user") {
+  const response = await fetch(`${API_URL}/chat/clear`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ user_id: userId }),
   });
 
   if (!response.ok) {

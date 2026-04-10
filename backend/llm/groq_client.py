@@ -139,6 +139,56 @@ def _normalize_result(raw: Any) -> Dict[str, Any]:
     return {"intent": intent, "confidence": confidence, "entities": entities}
 
 
+def _truncate_text(value: Any, limit: int = 240) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3].rstrip()}..."
+
+
+def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
+    """Format the recent session state for classification and response generation."""
+
+    history = session.get("history", [])
+    if not isinstance(history, list):
+        history = []
+
+    lines: list[str] = []
+
+    flow = str(session.get("flow") or "").strip()
+    if flow:
+        lines.append(f"Active flow: {flow}")
+
+    intent = str(session.get("intent") or "").strip()
+    if intent:
+        lines.append(f"Current intent: {intent}")
+
+    entities = _normalize_entities(session.get("entities", {}))
+    populated_entities = {k: v for k, v in entities.items() if str(v).strip()}
+    if populated_entities:
+        lines.append(f"Known entities: {json.dumps(populated_entities, ensure_ascii=True)}")
+
+    summary = _truncate_text(session.get("conversation_summary"), limit=160)
+    if summary:
+        lines.append(f"Conversation summary: {summary}")
+
+    recent_turns = []
+    for turn in history[-max_history:]:
+        if not isinstance(turn, dict):
+            continue
+        role = str(turn.get("role") or "user").strip().lower()
+        label = "User" if role == "user" else "Assistant"
+        text = _truncate_text(turn.get("text"), limit=180)
+        if text:
+            recent_turns.append(f"{label}: {text}")
+
+    if recent_turns:
+        lines.append("Recent conversation:")
+        lines.extend(recent_turns)
+
+    return "\n".join(lines).strip()
+
+
 def _post_chat_completions(*, messages: list[dict[str, str]], max_tokens: int = 250) -> str:
     """Call Groq's OpenAI-compatible chat completions endpoint and return content."""
 
@@ -182,12 +232,6 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
         Normalized dict: {intent, confidence, entities}
     """
 
-    flow = session.get("flow")
-    session_hint = ""
-    if flow in {"complaint", "billing", "followup", "payment_reflection", "escalation_form"}:
-        # Provide lightweight context to keep multi-turn flows stable.
-        session_hint = f"Active flow: {flow}."
-
     system = WATER_UTILITY_GUARDRAIL_SYSTEM_PROMPT
     # IMPORTANT: this prompt contains JSON examples with braces.
     # Using .format() would treat braces as placeholders, so we do a safe replace instead.
@@ -195,10 +239,12 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
         "{allowed_intents}", ", ".join(sorted(ALLOWED_INTENTS_SET))
     )
 
+    session_context = _conversation_context_block(session)
+    session_section = f"Session context:\n{session_context}\n\n" if session_context else ""
     user_content = (
         f"{schema}\n\n"
-        f"{session_hint}\n"
-        f"User message: {message}"
+        f"{session_section}"
+        f"Latest user message: {message}"
     ).strip()
 
     text = _post_chat_completions(
@@ -306,14 +352,14 @@ def generate_response(
 ) -> str:
     """Generate a natural language response using Groq (text output)."""
 
-    flow = session.get("flow")
-    session_hint = f"Active flow: {flow}." if flow else ""
     intent_hint = f"Detected intent: {intent}." if intent else ""
+    session_context = _conversation_context_block(session)
+    session_section = f"Session context:\n{session_context}\n\n" if session_context else ""
     facts_block = f"\n\nFACTS (use only these facts when giving specific details):\n{facts}" if facts else ""
     extra = f"\n\nExtra instructions:\n{additional_instructions}" if additional_instructions else ""
 
     user_content = (
-        f"{session_hint}\n{intent_hint}\n\nUser message: {message}{facts_block}{extra}\n\n"
+        f"{session_section}{intent_hint}\n\nLatest user message: {message}{facts_block}{extra}\n\n"
         "Reply as the assistant."
     ).strip()
 

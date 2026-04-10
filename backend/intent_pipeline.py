@@ -1,21 +1,23 @@
 """backend/intent_pipeline.py
 
-Hybrid intent classification pipeline.
-
-Combines:
+Advanced hybrid intent classification pipeline with:
 1. Rule-based classification for obvious intents
 2. Lightweight AI classifier for common cases
 3. LLM classifier for complex cases
-4. Arbitration to select highest-confidence result
+4. Ensemble voting with confidence calibration
+5. Entity extraction and refinement
+6. Context-aware disambiguation
+7. Classification telemetry
 """
 
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from dataclasses import dataclass, field
+from datetime import datetime
 
-import requests
 
 from .config import config
 from .intents import ALLOWED_INTENTS_SET
@@ -23,8 +25,38 @@ from .logger import logger
 from .llm.groq_client import classify_intent as groq_classify_intent
 
 
+@dataclass
+class ClassificationResult:
+    """Structured classification result with metadata."""
+    intent: str
+    confidence: float
+    entities: Dict[str, Any]
+    source: str
+    timestamp: Optional[str] = None
+    ensemble_votes: Dict[str, float] = field(default_factory=dict)
+    disambiguation_needed: bool = False
+    reasoning: str = ""
+
+    def __post_init__(self):
+        if self.timestamp is None:
+            self.timestamp = datetime.now().isoformat()
+        if self.ensemble_votes is None:
+            self.ensemble_votes = {}
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            "intent": self.intent,
+            "confidence": self.confidence,
+            "entities": self.entities,
+            "source": self.source,
+            "timestamp": self.timestamp,
+            "disambiguation_needed": self.disambiguation_needed,
+        }
+
+
 class IntentPipeline:
-    """Hybrid intent classification pipeline."""
+    """Advanced hybrid intent classification pipeline."""
 
     def __init__(self):
         self.rule_patterns = {
@@ -33,15 +65,16 @@ class IntentPipeline:
                 r"\b(how\s+are\s+you|what's\s+up|how\s+do\s+you\s+do)\b",
                 r"\b(who\s+are\s+you|what\s+are\s+you|what\s+do\s+you\s+do)\b",
             ],
+            "billing_inquiry": [
+                r"\b(bill|billing|balance|check.*bill|my.*bill)\b",
+                r"\b(account|owe|due|charges?|how.*much)\b",
+                r"\b(check|view)\s+(?:my\s+)?(?:account|bill|balance)\b",
+            ],
             "report_fault": [
                 r"\b(no\s+water|water\s+is\s+off|water\s+cut|water\s+outage)\b",
-                r"\b(leak|leaking|burst\s+pipe|pipe\s+burst)\b",
+                r"\b(leak|leaking|burst\s+pipe|burst\s+water\s+pipe|pipe\s+burst)\b",
                 r"\b(dirty\s+water|water\s+is\s+dirty|contaminated\s+water)\b",
                 r"\b(low\s+pressure|water\s+pressure\s+low)\b",
-            ],
-            "billing_inquiry": [
-                r"\b(bill|billing|account|balance|charges?|due|payment)\b",
-                r"\b(how\s+much|what\s+is\s+my|check\s+my)\b.*\b(bill|balance|account)\b",
             ],
             "complaint_followup": [
                 r"\b(ticket|reference|wc-|status|check|update)\b",
@@ -55,34 +88,173 @@ class IntentPipeline:
                 r"\b(office|location|address|hours|open|close|contact|phone|email)\b",
                 r"\b(where\s+is|how\s+to\s+find|directions?)\b",
             ],
+            "new_connection": [
+                r"new\s+connection",
+                r"need.*new.*connection",
+            ],
             "payment_info": [
-                r"\b(payment|pay|how\s+to\s+pay|payment\s+methods?|options?)\b",
+                r"\b(how\s+to\s+pay|payment\s+methods?|pay|options?)\b",
                 r"\b(mobile|money|bank|transfer|cash|office)\b.*\b(payment|pay)\b",
             ],
         }
 
     def classify(self, message: str, context: dict) -> dict:
-        """Run hybrid intent classification pipeline."""
+        """Run advanced hybrid intent classification pipeline with ensemble voting."""
         message_lower = message.lower().strip()
 
-        # Step 1: Rule-based classification
+        # Step 1: Extract entities
+        entities = self._extract_entities(message, context)
+
+        # Step 2: Get classifications from all sources
         rule_result = self._rule_based_classify(message_lower)
-        if rule_result["confidence"] >= 0.9:
-            rule_result["source"] = "rule"
-            return rule_result
-
-        # Step 2: Lightweight AI classification
         lightweight_result = self._lightweight_classify(message, context)
-        if lightweight_result["confidence"] >= 0.8:
-            lightweight_result["source"] = "lightweight"
-            return lightweight_result
-
-        # Step 3: LLM classification
         llm_result = self._llm_classify(message, context)
-        llm_result["source"] = "llm"
 
-        # Step 4: Arbitration
-        return self._arbitrate([rule_result, lightweight_result, llm_result])
+        # Step 3: Ensemble voting with weighted calibration
+        ensemble_result = self._ensemble_vote(
+            [rule_result, lightweight_result, llm_result],
+            message,
+            context
+        )
+
+        # Step 4: Merge entities
+        ensemble_result["entities"].update(entities)
+
+        # Step 5: Confidence calibration based on source reliability
+        ensemble_result = self._calibrate_confidence(ensemble_result, message_lower)
+
+        return ensemble_result
+
+    def _extract_entities(self, message: str, context: dict) -> Dict[str, Any]:
+        """Extract entities from message (locations, account numbers, etc)."""
+        entities = {}
+        message_lower = message.lower()
+
+        # Extract account/reference numbers (WC-XXXX or ticket IDs)
+        ticket_match = re.search(r'\b(wc-\d+|\d{8,})\b', message_lower)
+        if ticket_match:
+            entities["ticket_id"] = ticket_match.group(1).upper()
+
+        # Extract location/area mentions
+        area_keywords = ["kabwe", "lusaka", "ndola", "kitwe", "livingstone", "chingola", "mufulira"]
+        for area in area_keywords:
+            if area in message_lower:
+                entities["area"] = area.capitalize()
+                break
+
+        # Extract account number patterns
+        account_match = re.search(r'\b\d{6,}\b', message)
+        if account_match and not ticket_match:
+            entities["account_number"] = account_match.group(0)
+
+        # Extract named entities for complaint details
+        if "leak" in message_lower or "burst" in message_lower:
+            entities["fault_type"] = "leak" if "leak" in message_lower else "burst_pipe"
+        elif "no water" in message_lower or "outage" in message_lower:
+            entities["fault_type"] = "outage"
+        elif "dirty" in message_lower or "contaminated" in message_lower:
+            entities["fault_type"] = "water_quality"
+        elif "pressure" in message_lower:
+            entities["fault_type"] = "low_pressure"
+
+        return entities
+
+    def _ensemble_vote(self, results: List[dict], message: str, context: dict) -> dict:
+        """Ensemble voting with weighted confidence calibration."""
+        if not results:
+            return ClassificationResult(
+                intent="out_of_scope",
+                confidence=0.0,
+                entities={},
+                source="ensemble",
+                reasoning="No classification results available"
+            ).to_dict()
+
+        # Assign weights based on source reliability
+        source_weights = {
+            "rule": 1.3,      # Rule-based is highly reliable
+            "lightweight": 1.0,  # Baseline
+            "llm": 0.9,       # LLM slightly lower confidence
+        }
+
+        # Create weighted vote dictionary
+        weighted_votes: Dict[str, Dict[str, float]] = {}
+        for result in results:
+            intent = result.get("intent", "out_of_scope")
+            confidence = result.get("confidence", 0.0)
+            source = result.get("source", "unknown")
+            weight = source_weights.get(source, 1.0)
+
+            if intent not in weighted_votes:
+                weighted_votes[intent] = {"score_sum": 0.0, "weight_sum": 0.0}
+            weighted_votes[intent]["score_sum"] += confidence * weight
+            weighted_votes[intent]["weight_sum"] += weight
+
+        # Calculate normalized confidence per intent based on agreeing sources.
+        ensemble_votes = {
+            intent: vote_data["score_sum"] / vote_data["weight_sum"]
+            for intent, vote_data in weighted_votes.items()
+            if vote_data["weight_sum"] > 0
+        }
+
+        # Get highest voted intent
+        top_intent = max(ensemble_votes, key=lambda k: ensemble_votes[k])
+        top_confidence = ensemble_votes[top_intent]
+
+        # Check for disambiguation
+        disambiguation_needed = False
+        clarification_options = []
+
+        if top_confidence < 0.7:
+            # Low confidence - may need disambiguation
+            sorted_intents = sorted(ensemble_votes.items(), key=lambda x: x[1], reverse=True)
+            if len(sorted_intents) >= 2:
+                top1_score = sorted_intents[0][1]
+                top2_score = sorted_intents[1][1]
+                if top1_score - top2_score < 0.15:  # Close race
+                    disambiguation_needed = True
+                    clarification_options = [sorted_intents[0][0], sorted_intents[1][0]]
+
+        reasoning = f"Ensemble voted: {top_intent} (confidence: {top_confidence:.2f}) from {len(results)} classifiers"
+
+        return ClassificationResult(
+            intent=top_intent if not disambiguation_needed else "clarification_needed",
+            confidence=top_confidence,
+            entities={},
+            source="ensemble",
+            ensemble_votes=ensemble_votes,
+            disambiguation_needed=disambiguation_needed,
+            reasoning=reasoning
+        ).to_dict()
+
+    def _calibrate_confidence(self, result: dict, message_lower: str) -> dict:
+        """Calibrate confidence based on message length and clarity."""
+        intent = result.get("intent", "out_of_scope")
+        confidence = result.get("confidence", 0.0)
+
+        # Adjust for message length (shorter = more ambiguous)
+        word_count = len(message_lower.split())
+        if word_count < 3:
+            confidence *= 0.85  # Reduce confidence for very short messages
+        elif word_count > 20:
+            confidence *= 0.9  # Slight reduction for very long messages
+
+        # Boost confidence for clear intents with specific keywords
+        high_signal_keywords = {
+            "general_chat": ["hi", "hello", "hey", "how are you"],
+            "billing_inquiry": ["budget", "amount due", "balance"],
+            "report_fault": ["leak", "burst", "outage", "no water"],
+            "new_connection": ["new connection", "apply", "install"],
+            "escalation": ["agent", "speak", "human", "representative"],
+        }
+
+        if intent in high_signal_keywords:
+            if any(kw in message_lower for kw in high_signal_keywords[intent]):
+                confidence = min(0.98, confidence * 1.05)  # Boost but cap at 0.98
+
+        # Ensure confidence is in valid range
+        result["confidence"] = max(0.0, min(1.0, confidence))
+        return result
 
     def _rule_based_classify(self, message_lower: str) -> dict:
         """Rule-based classification for obvious intents."""
@@ -117,18 +289,18 @@ class IntentPipeline:
                 "source": "lightweight"
             }
 
-        # Check for billing-related
-        billing_keywords = ["bill", "billing", "account", "balance", "payment", "due", "amount"]
-        if any(word in message_lower for word in billing_keywords):
+        # Check for billing-related (PRIORITY HIGH)
+        billing_keywords = ["bill", "billing", "balance", "account", "check.*bill", "my bill", "owe", "due"]
+        if any(re.search(kw, message_lower) for kw in billing_keywords):
             return {
                 "intent": "billing_inquiry",
-                "confidence": 0.75,
+                "confidence": 0.95,
                 "entities": {},
                 "source": "lightweight"
             }
 
         # Check for complaints
-        complaint_keywords = ["leak", "fault", "problem", "issue", "no water", "water cut", "pressure"]
+        complaint_keywords = ["leak", "burst", "fault", "problem", "issue", "no water", "water cut", "pressure", "spraying"]
         if any(phrase in message_lower for phrase in complaint_keywords):
             return {
                 "intent": "report_fault",
@@ -142,6 +314,26 @@ class IntentPipeline:
         if any(word in message_lower for word in followup_keywords):
             return {
                 "intent": "complaint_followup",
+                "confidence": 0.8,
+                "entities": {},
+                "source": "lightweight"
+            }
+
+        # Check for new connection
+        connection_keywords = ["new connection", "apply for connection", "set up connection"]
+        if any(phrase in message_lower for phrase in connection_keywords):
+            return {
+                "intent": "new_connection",
+                "confidence": 0.8,
+                "entities": {},
+                "source": "lightweight"
+            }
+
+        # Check for new connection
+        connection_keywords = ["new connection", "apply for connection", "set up connection"]
+        if any(phrase in message_lower for phrase in connection_keywords):
+            return {
+                "intent": "new_connection",
                 "confidence": 0.8,
                 "entities": {},
                 "source": "lightweight"
@@ -162,13 +354,13 @@ class IntentPipeline:
             logger.warning(f"LLM classification failed: {e}")
             return {
                 "intent": "out_of_scope",
-                "confidence": 0.5,
+                "confidence": 0.1,
                 "entities": {},
                 "source": "llm"
             }
 
     def _arbitrate(self, results: list[dict]) -> dict:
-        """Arbitrate between multiple classification results."""
+        """Legacy method - kept for compatibility. Use ensemble_vote instead."""
         if not results:
             return {
                 "intent": "out_of_scope",

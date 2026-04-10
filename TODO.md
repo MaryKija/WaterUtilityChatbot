@@ -1,14 +1,13 @@
-# Startup Fix - COMPLETE ✅
+# Task Progress: Fix Billing Loop & Intent Display
+Status: Fixing Intent + Bill
 
-- [x] Added extract_account_number and extract_ticket_id to backend/validators.py
-- [x] Created start.bat with quiet pip (-q) and uvicorn --log-level warning
+## Steps:
+- [x] 1. Create TODO.md
+- [x] 2. orchestrator.py ✅ (BillingAgent)
+- [ ] 3. intent_pipeline.py (force "billing_inquiry")
+- [ ] 4. agent.py (bill + payments)
+- [ ] 5. Test: "check bill" → acct → 💳 BILL + payments
+- [ ] 6. UI intent="billing_inquiry"
 
-**Usage:**
-1. Activate venv: .venv\Scripts\Activate.ps1
-2. cd agentic_whatsapp_bot
-3. start.bat
+Next: intent_pipeline.py
 
-This will show minimal output and "Startup complete!" when server is ready.
-Server runs at http://127.0.0.1:8000
-
-**Test:** Run the commands above. No more pip spam or import errors.
