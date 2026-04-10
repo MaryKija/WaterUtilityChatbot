@@ -75,9 +75,15 @@ def get_bill(account_number: str):
     
     # Generate random bill for unknown accounts
     if account_number not in mock_bills:
+        # SEED using the account number to keep data consistent
+        random.seed(account_number)
+        
         amount = round(random.uniform(150, 400), 2)
-        due_date = (datetime.now() + timedelta(days=random.randint(10, 30))).strftime("%Y-%m-%d")
+        due_days = random.randint(10, 30)
+        due_date = (datetime.now() + timedelta(days=due_days)).strftime("%Y-%m-%d")
         bill_data = {"amount": amount, "due_date": due_date, "status": "unpaid"}
+    
+        random.seed()  # Reset seed to system time for other operations
     else:
         bill_data = mock_bills[account_number]
     

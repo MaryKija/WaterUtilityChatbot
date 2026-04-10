@@ -256,7 +256,7 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
 
         details: Dict[str, Any] = session.setdefault("payment_details", {})
 
-        acct = extract_account_number(message)
+        acct = extract_account_number(message) or session.get("account_number")
         if acct:
             details["account_number"] = acct
 
@@ -480,14 +480,13 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
 
         # Case C: simple bill check
         acct = extract_account_number(message) or session.get("account_number")
-        if acct:
-            session["account_number"] = acct
+        
         if not acct:
             return "Please provide your account number (e.g., 123456 or account_number: 123456)."
-
+        
         result = get_bill(acct)
         session["account_number"] = acct  # Persist for payments
-        session.clear()
+        session.pop("flow", None)  
         payment_methods = get_payment_methods()
         return result + f"\n\n{payment_methods}"
 

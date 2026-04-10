@@ -130,6 +130,9 @@ class IntentPipeline:
         entities = {}
         message_lower = message.lower()
 
+        billing_keywords = ["bill", "billing", "balance", "account", "check.*bill", "my bill", "owe", "due"]
+
+
         # Extract account/reference numbers (WC-XXXX or ticket IDs)
         ticket_match = re.search(r'\b(wc-\d+|\d{8,})\b', message_lower)
         if ticket_match:
@@ -146,6 +149,17 @@ class IntentPipeline:
         account_match = re.search(r'\b\d{6,}\b', message)
         if account_match and not ticket_match:
             entities["account_number"] = account_match.group(0)
+
+        account_match = re.search(r"\b\d{6}\b", message_lower)
+        account_number = account_match.group(0) if account_match else None 
+
+        if any(re.search(kw, message_lower) for kw in billing_keywords):
+            return {
+                "intent": "billing_inquiry",
+                "confidence": 0.95,
+                "entities": {"account_number": account_number}, # Now it's captured!
+                "source": "lightweight"
+            }
 
         # Extract named entities for complaint details
         if "leak" in message_lower or "burst" in message_lower:
@@ -298,7 +312,7 @@ class IntentPipeline:
                 "entities": {},
                 "source": "lightweight"
             }
-
+        
         # Check for complaints
         complaint_keywords = ["leak", "burst", "fault", "problem", "issue", "no water", "water cut", "pressure", "spraying"]
         if any(phrase in message_lower for phrase in complaint_keywords):
