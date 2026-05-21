@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+import asyncio
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 from backend.context_engine import (
     context_manager,
     initialize_context,
@@ -6,7 +11,11 @@ from backend.context_engine import (
     extract_entities,
     expire_flow_if_needed,
 )
+<<<<<<< HEAD
 from backend.main import app
+=======
+from main import app
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 from backend.orchestrator import ComplaintAgent
 from fastapi.testclient import TestClient
 
@@ -119,6 +128,7 @@ def test_general_agent_handle_clears_stale_state(monkeypatch):
 
     monkeypatch.setattr(groq_client, "generate_response", lambda *args, **kwargs: "Stub reply")
 
+<<<<<<< HEAD
     context = initialize_context("u9")
     context["active_agent"] = "general_agent"
     context["intent"] = "general_chat"
@@ -130,6 +140,21 @@ def test_general_agent_handle_clears_stale_state(monkeypatch):
     assert context["active_agent"] is None
     assert context["intent"] is None
     assert context["entities"] == {}
+=======
+    # Idle general chat with stale entities — no active specialist flow
+    context = initialize_context("u9")
+    context["intent"] = "general_chat"
+    context["entities"] = {"account_number": "123456"}
+
+    async def run() -> None:
+        out = await GeneralAgent().handle("hello", context)
+        assert out["reply"] == "Stub reply"
+        assert context["active_agent"] is None
+        assert context["intent"] is None
+        assert context["entities"] == {}
+
+    asyncio.run(run())
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def test_clear_chat_endpoint():
@@ -139,16 +164,24 @@ def test_clear_chat_endpoint():
     assert response.json().get("status") == "cleared"
 
 
+<<<<<<< HEAD
 def test_flow_restart_on_greeting_during_active_workflow():
     client = TestClient(app)
 
     # Ensure starting fresh
+=======
+def test_flow_restart_explicit_reset_after_billing_flow():
+    """Explicit reset clears locked billing flow so a new intent can classify."""
+    client = TestClient(app)
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     client.post("/chat/clear", json={"user_id": "u6"})
 
     r1 = client.post("/chat", json={"user_id": "u6", "message": "I want to check my bill balance"})
     assert r1.status_code == 200
     assert r1.json().get("intent") == "billing_inquiry"
 
+<<<<<<< HEAD
     r2 = client.post("/chat", json={"user_id": "u6", "message": "hi"})
     assert r2.status_code == 200
     assert "reset" in r2.json().get("reply", "").lower()
@@ -156,6 +189,15 @@ def test_flow_restart_on_greeting_during_active_workflow():
     r3 = client.post("/chat", json={"user_id": "u6", "message": "water outage"})
     assert r3.status_code == 200
     assert r3.json().get("intent") in {"report_fault", "general_chat"}
+=======
+    r_clear = client.post("/chat/clear", json={"user_id": "u6"})
+    assert r_clear.status_code == 200
+    assert r_clear.json().get("status") == "cleared"
+
+    r3 = client.post("/chat", json={"user_id": "u6", "message": "water outage"})
+    assert r3.status_code == 200
+    assert r3.json().get("intent") in {"report_fault", "leak_report", "general_chat"}
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def test_complaint_agent_advances_after_plain_name_reply():
@@ -165,6 +207,7 @@ def test_complaint_agent_advances_after_plain_name_reply():
     context["active_agent"] = "complaint_agent"
     context["flow_started"] = True
 
+<<<<<<< HEAD
     first = agent.handle("I want to report a water outage", context)
     assert "full name" in first["reply"].lower()
     assert context["entities"].get("issue") == "Water outage"
@@ -172,6 +215,33 @@ def test_complaint_agent_advances_after_plain_name_reply():
     second = agent.handle("mary kija", context)
     assert "area or address" in second["reply"].lower()
     assert context["entities"].get("name") == "mary kija"
+=======
+    async def run() -> None:
+        first = await agent.handle("I want to report a water outage", context)
+        assert "full name" in first["reply"].lower()
+        assert context["entities"].get("issue") == "Water outage"
+
+        second = await agent.handle("mary kija", context)
+        assert "area or address" in second["reply"].lower()
+        assert context["entities"].get("name") == "mary kija"
+
+    asyncio.run(run())
+
+
+def test_complaint_followup_requests_status_tool_when_ticket_present():
+    agent = ComplaintAgent()
+    context = initialize_context("cfu-1")
+    context["intent"] = "complaint_followup"
+    context["entities"] = {"ticket_id": "WC-O2YEQJ"}
+
+    async def run() -> None:
+        decision = await agent.handle("complaint status", context)
+        assert decision.get("requires_tool") is True
+        assert decision.get("tool_name") == "get_complaint_status"
+        assert decision.get("parameters", {}).get("ticket_id") == "WC-O2YEQJ"
+
+    asyncio.run(run())
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def test_complaint_agent_rejects_non_name_when_waiting_for_name():
@@ -182,10 +252,19 @@ def test_complaint_agent_rejects_non_name_when_waiting_for_name():
     context["flow_started"] = True
     context["step"] = "collect_name"
 
+<<<<<<< HEAD
     response = agent.handle("still experiencing the issue", context)
 
     assert "full name" in response["reply"].lower()
     assert "name" not in context["entities"]
+=======
+    async def run() -> None:
+        response = await agent.handle("still experiencing the issue", context)
+        assert "full name" in response["reply"].lower()
+        assert "name" not in context["entities"]
+
+    asyncio.run(run())
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def test_tool_executor_calls_dict_based_complaint_tool(monkeypatch):
@@ -196,6 +275,7 @@ def test_tool_executor_calls_dict_based_complaint_tool(monkeypatch):
 
     executor = ToolExecutor()
     context = initialize_context("tool-user")
+<<<<<<< HEAD
     result = executor.execute(
         "log_complaint",
         {"name": "mary kija", "area": "Matero East", "issue": "Water outage"},
@@ -204,4 +284,17 @@ def test_tool_executor_calls_dict_based_complaint_tool(monkeypatch):
 
     assert "WC-ABC123" in result
     assert context["entities"]["ticket_id"] == "WC-ABC123"
+=======
+
+    async def run() -> None:
+        result = await executor.execute(
+            "log_complaint",
+            {"name": "mary kija", "area": "Matero East", "issue": "Water outage"},
+            context,
+        )
+        assert "WC-ABC123" in result
+        assert context["entities"]["ticket_id"] == "WC-ABC123"
+
+    asyncio.run(run())
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 

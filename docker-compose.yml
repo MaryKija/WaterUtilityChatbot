@@ -1,0 +1,65 @@
+# ============================================================
+# Water Utility Chatbot — Docker Compose
+# ============================================================
+# Starts both the FastAPI backend and the React frontend.
+#
+# Quick start:
+#   1. cp .env.example .env   (fill in GROQ_API_KEY and passwords)
+#   2. docker compose up --build
+#   3. Open http://localhost:5173  (customer chat)
+#      Open http://localhost:8000/admin  (admin dashboard)
+#
+# For a company website embed, point the iframe / script tag at
+# http://<your-server>:5173 or serve the built frontend from the
+# backend's /static mount (run `npm run build` first).
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------
+  # FastAPI backend
+  # ----------------------------------------------------------
+  backend:
+    build: .
+    container_name: water_chatbot_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Persist the SQLite database and logs outside the container
+      - ./water_utility.db:/app/water_utility.db
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ----------------------------------------------------------
+  # React / Vite frontend (development mode)
+  # For production, build with `npm run build` and serve the
+  # dist/ folder via the backend's static mount instead.
+  # ----------------------------------------------------------
+  frontend:
+    image: node:20-alpine
+    container_name: water_chatbot_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend/aqua-chat-modern-main:/app
+      # Prevent node_modules from being overwritten by the host mount
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      # In dev mode the Vite proxy forwards API calls to the backend service
+      - VITE_BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

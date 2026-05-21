@@ -1,5 +1,6 @@
 """backend/agent.py
 
+<<<<<<< HEAD
 Groq-only, LLM-first agent router.
 
 Deterministic templates remain only for:
@@ -8,6 +9,13 @@ Deterministic templates remain only for:
 - escalation forms
 
 Everything else is answered naturally via Groq with water-utility guardrails.
+=======
+Agent router for water utility service flows.
+
+Core utility workflows are deterministic and tool-backed so the app still works
+when the LLM provider is unavailable. Groq is used only to improve natural
+language handling where a safe fallback exists.
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 """
 
 from __future__ import annotations
@@ -36,6 +44,10 @@ from .tools import (
 )
 from .validators import extract_account_number, extract_ticket_id, is_valid_name, is_valid_phone, is_valid_email
 from .llm.groq_client import generate_response, detect_human_request, classify_billing_subintent
+<<<<<<< HEAD
+=======
+from .customer_auth import customer_auth_service
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def _ensure_escalated_footer(text: str) -> str:
@@ -56,6 +68,20 @@ def _log_escalation(*, reason: str, intent: str, confidence: float) -> None:
     )
 
 
+<<<<<<< HEAD
+=======
+def _record_tool_selection(session: dict, tool_name: str, reason: str, parameters: Optional[dict] = None) -> None:
+    """Record observable tool-selection metadata for direct agent.py tool calls."""
+
+    session["last_tool_used"] = tool_name
+    session["last_tool_reason"] = reason
+    session.setdefault("tool_trace", []).append(
+        {"tool": tool_name, "reason": reason, "parameters": parameters or {}}
+    )
+    logger.info(f"Tool selected: {tool_name} reason={reason}")
+
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def _normalize_escalation_reason(reason: str) -> str:
     r = (reason or "").strip().lower()
     if r in {"low_confidence", "payment_issue", "human_request", "complex_case"}:
@@ -94,6 +120,7 @@ def _ensure_escalation_record(
 
 
 def _decline_out_of_scope(message: str, session: dict) -> str:
+<<<<<<< HEAD
     return generate_response(
         message,
         session,
@@ -104,6 +131,46 @@ def _decline_out_of_scope(message: str, session: dict) -> str:
         ),
         max_tokens=120,
     )
+=======
+    try:
+        return generate_response(
+            message,
+            session,
+            intent="out_of_scope",
+            additional_instructions=(
+                "Politely say you can only assist with water utility services such as billing, faults, meter issues, "
+                "complaints, payments, and connections. Do not escalate. End by asking how you can help with their water service."
+            ),
+            max_tokens=120,
+        )
+    except Exception as exc:
+        logger.warning(f"LLM unavailable for out_of_scope response; using deterministic fallback err={exc}")
+        return (
+            "I can only assist with water utility services such as billing, faults, "
+            "complaints, payments, meter issues, office information, and new connections."
+        )
+
+
+def _safe_generate_response(message: str, session: dict, *, intent: str, **kwargs: Any) -> str:
+    """Generate an LLM response, with clear deterministic fallback text."""
+
+    try:
+        return generate_response(message, session, intent=intent, **kwargs)
+    except Exception as exc:
+        logger.warning(f"LLM unavailable for intent={intent}; using deterministic fallback err={exc}")
+        if intent == "general_chat":
+            return (
+                "I can help with water utility services such as billing, faults, "
+                "complaints, payments, office information, and new connections."
+            )
+        if intent == "office_info":
+            return str(kwargs.get("facts") or get_office_info())
+        return (
+            "The AI response service is temporarily unavailable, but I can still help "
+            "with billing lookups, complaint logging, complaint status checks, payments, "
+            "office information, and human escalation."
+        )
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def _extract_phone_number(message: str) -> Optional[str]:
@@ -151,6 +218,7 @@ def _payment_not_reflected_prompt(missing: Optional[list[str]] = None) -> str:
         return (
             "I can help check your payment.\n\n"
             "Please provide:\n\n"
+<<<<<<< HEAD
             "• Account Number\n"
             "• Payment Method (MTN/Airtel/Bank)\n"
             "• Approximate Payment Date\n"
@@ -158,6 +226,15 @@ def _payment_not_reflected_prompt(missing: Optional[list[str]] = None) -> str:
         )
 
     missing_lines = "\n".join(f"• {m}" for m in missing)
+=======
+            "- Account Number\n"
+            "- Payment Method (MTN/Airtel/Bank)\n"
+            "- Approximate Payment Date\n"
+            "- Amount Paid"
+        )
+
+    missing_lines = "\n".join(f"- {m}" for m in missing)
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     return (
         "I can help check your payment.\n\n"
         "Please provide:\n\n"
@@ -202,6 +279,28 @@ def _fill_complaint_fields_from_message(message: str, session: dict) -> dict:
     return session
 
 
+<<<<<<< HEAD
+=======
+def _minutes_remaining(locked_until_str: str) -> int:
+    """Return whole minutes remaining until *locked_until_str* (ISO 8601 UTC).
+
+    Returns at least 1 so the message never says "0 minute(s)".
+    """
+    from datetime import datetime, timezone
+
+    try:
+        locked_until_dt = datetime.fromisoformat(locked_until_str)
+        if locked_until_dt.tzinfo is None:
+            locked_until_dt = locked_until_dt.replace(tzinfo=timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        delta_seconds = (locked_until_dt - now_utc).total_seconds()
+        mins = int(delta_seconds // 60)
+        return max(mins, 1)
+    except (ValueError, TypeError):
+        return 1
+
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def run_agent(message: str, intent_data: dict, context: dict) -> str:
     """Updated to use context (entities persisted)"""
     session = context
@@ -390,10 +489,27 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
         return _decline_out_of_scope(message, session)
 
     # =====================================================
+<<<<<<< HEAD
     # Human request detection (Groq-only; confidence irrelevant)
     # =====================================================
     if routed_intent != "escalation":
         human = detect_human_request(message, session)
+=======
+    # Human request detection
+    # =====================================================
+    if routed_intent != "escalation":
+        explicit_human_request = bool(
+            re.search(r"\b(agent|human|representative|operator|customer service)\b", message, re.IGNORECASE)
+        )
+        if explicit_human_request:
+            human = {"request_human": True}
+        else:
+            try:
+                human = detect_human_request(message, session)
+            except Exception as exc:
+                logger.warning(f"Human request detector unavailable; using deterministic fallback err={exc}")
+                human = {"request_human": False}
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         if human.get("request_human"):
             routed_intent = "escalation"
             intent_data["escalation_reason"] = "human_request"
@@ -403,7 +519,11 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
     # =====================================================
     if routed_intent == "general_chat":
         session.clear()
+<<<<<<< HEAD
         return generate_response(message, session, intent=routed_intent, max_tokens=140)
+=======
+        return _safe_generate_response(message, session, intent=routed_intent, max_tokens=140)
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     # =====================================================
     # Complaints / faults (template flow)
@@ -427,6 +547,15 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
                 "I can help report this issue. Please provide:\n" + "\n".join(f"- {f}" for f in missing)
             )
 
+<<<<<<< HEAD
+=======
+        _record_tool_selection(
+            session,
+            "log_complaint",
+            "complaint fields collected; complaints system ticket required",
+            {k: session.get(k) for k in required},
+        )
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         result = log_complaint(session)
         session.clear()
         return result
@@ -437,7 +566,21 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
     if routed_intent == "billing_inquiry":
         session.setdefault("flow", "billing")
         if "billing_case" not in session:
+<<<<<<< HEAD
             session["billing_case"] = classify_billing_subintent(message, session).get("case", "bill_check")
+=======
+            try:
+                session["billing_case"] = classify_billing_subintent(message, session).get("case", "bill_check")
+            except Exception as exc:
+                logger.warning(f"Billing subintent classifier unavailable; using deterministic fallback err={exc}")
+                lower_msg = message.lower()
+                if any(p in lower_msg for p in ["not reflected", "paid", "payment missing", "still unpaid"]):
+                    session["billing_case"] = "payment_not_reflected"
+                elif any(p in lower_msg for p in ["wrong bill", "too high", "incorrect", "wrong reading"]):
+                    session["billing_case"] = "wrong_bill"
+                else:
+                    session["billing_case"] = "bill_check"
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
         billing_case = session.get("billing_case", "bill_check")
 
@@ -465,8 +608,13 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
                 return (
                     "I understand you believe your bill is incorrect.\n\n"
                     "Please provide:\n\n"
+<<<<<<< HEAD
                     "• Account Number\n"
                     "• What seems incorrect (high bill, wrong reading, etc)\n\n"
+=======
+                    "- Account Number\n"
+                    "- What seems incorrect (high bill, wrong reading, etc)\n\n"
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
                     "We will investigate this."
                 )
 
@@ -479,6 +627,7 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
             )
 
         # Case C: simple bill check
+<<<<<<< HEAD
         acct = extract_account_number(message) or session.get("account_number")
         
         if not acct:
@@ -487,6 +636,98 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
         result = get_bill(acct)
         session["account_number"] = acct  # Persist for payments
         session.pop("flow", None)  
+=======
+        acct = extract_account_number(message) or session.get("account_number") or context.get("entities", {}).get("account_number")
+
+        if not acct:
+            if is_valid_name(message.strip()):
+                return (
+                    "I can only look up your balance with your numeric account number "
+                    "(usually 6 or more digits on your bill or meter card). "
+                    "Please send that number when you have it."
+                )
+            return "Please provide your account number (e.g., 123456 or account_number: 123456)."
+
+        # --- Account-number validation and zero-padding (Requirements 1.5, 1.6, 5.1) ---
+
+        # Step 1: zero-pad purely numeric strings shorter than 6 digits
+        if acct.isdigit() and len(acct) < 6:
+            acct = acct.zfill(6)
+
+        # Step 2: reject inputs that are non-numeric or longer than 6 digits
+        if not re.fullmatch(r"\d{6}", acct):
+            invalid_attempts = session.get("acct_invalid_attempts", 0) + 1
+            session["acct_invalid_attempts"] = invalid_attempts
+            if invalid_attempts >= 3:
+                # End the billing flow after 3 invalid attempts
+                session.pop("flow", None)
+                session.pop("billing_case", None)
+                session.pop("acct_invalid_attempts", None)
+                return (
+                    "You have entered an invalid account number 3 times. "
+                    "Please contact our office for assistance."
+                )
+            return (
+                "That doesn't look like a valid account number. "
+                "Please enter a 6-digit numeric account number (e.g., 000001). "
+                f"You have {3 - invalid_attempts} attempt(s) remaining."
+            )
+
+        # Valid account number — clear any previous invalid-attempt counter
+        session.pop("acct_invalid_attempts", None)
+
+        # --- End account-number validation ---
+
+        # --- PIN gate (Requirements 3.2, 3.3, 3.4, 3.6, 3.7, 4.4, 5.2, 5.3, 5.4, 5.5, 5.8, 8.4) ---
+
+        # Persist the validated account number into entities so it survives across turns.
+        entities = context.get("entities", {})
+        entities["account_number"] = acct
+        context["entities"] = entities
+
+        if not entities.get("pin_verified"):
+            # Try to extract a 4-digit PIN from the current message.
+            candidate = None
+            stripped = message.strip()
+            if re.fullmatch(r"\d{4}", stripped):
+                candidate = stripped
+
+            if candidate is None:
+                # No PIN in this message — prompt for it (must NOT include account number).
+                return "Please enter your 4-digit PIN to access your billing information."
+
+            # Verify the candidate PIN.
+            pin_result = customer_auth_service.verify_pin(acct, candidate)
+
+            if pin_result.locked:
+                mins = _minutes_remaining(pin_result.locked_until)
+                return f"Your account is temporarily locked. Please try again in {mins} minute(s)."
+
+            if not pin_result.success:
+                return f"Incorrect PIN. You have {pin_result.remaining_attempts} attempt(s) remaining."
+
+            # Success — mark session as PIN-verified and fall through to get_bill().
+            entities["pin_verified"] = True
+            context["entities"] = entities
+
+        # --- End PIN gate ---
+
+        _record_tool_selection(
+            session,
+            "get_bill",
+            "billing intent with account number; billing system lookup required",
+            {"account_number": acct},
+        )
+        result = get_bill(acct)
+        session["account_number"] = acct  # Persist for payments
+        session.pop("flow", None)  
+        _record_tool_selection(
+            session,
+            "get_payment_methods",
+            "billing response includes payment channels for next action",
+            {},
+        )
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         payment_methods = get_payment_methods()
         return result + f"\n\n{payment_methods}"
 
@@ -518,6 +759,15 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
 
         if collected >= len(required):
             # Complete
+<<<<<<< HEAD
+=======
+            _record_tool_selection(
+                session,
+                "create_connection_request",
+                "new connection fields collected; CRM request required",
+                {k: session.get(k) for k in required},
+            )
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
             result = create_connection_request(session)
             session.clear()
             return result
@@ -536,6 +786,10 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
     # Payment methods (only when explicitly asked)
     # =====================================================
     if routed_intent == "payment_info":
+<<<<<<< HEAD
+=======
+        _record_tool_selection(session, "get_payment_methods", "payment information requested", {})
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         session.clear()
         return get_payment_methods()
 
@@ -549,6 +803,15 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
         if not ticket:
             return "Please provide your reference number (e.g., WC-A1B2C3)."
 
+<<<<<<< HEAD
+=======
+        _record_tool_selection(
+            session,
+            "get_complaint_status",
+            "ticket_id provided; complaints status lookup required",
+            {"ticket_id": ticket},
+        )
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         result = get_complaint_status(ticket)
         session.clear()
         return result
@@ -557,15 +820,31 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
     # Office info: ground the response on known facts
     # =====================================================
     if routed_intent == "office_info":
+<<<<<<< HEAD
         office = get_office_info()
         session.clear()
         return generate_response(
+=======
+        _record_tool_selection(
+            session,
+            "get_office_info",
+            "office/contact facts requested; branch directory lookup required",
+            {},
+        )
+        office = get_office_info()
+        session.clear()
+        return _safe_generate_response(
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
             message,
             session,
             intent=routed_intent,
             facts=office,
             additional_instructions="Use the FACTS content verbatim when providing addresses, hours, or contacts.",
+<<<<<<< HEAD
             max_tokens=180,
+=======
+            max_tokens=120,
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         )
 
     # =====================================================
@@ -607,7 +886,14 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
         return form_prompt
 
     # =====================================================
+<<<<<<< HEAD
     # Default: Groq natural response inside guardrails
     # =====================================================
     session.clear()
     return generate_response(message, session, intent=routed_intent, max_tokens=180)
+=======
+    # Default: natural response inside guardrails, with deterministic fallback
+    # =====================================================
+    session.clear()
+    return _safe_generate_response(message, session, intent=routed_intent, max_tokens=120)
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)

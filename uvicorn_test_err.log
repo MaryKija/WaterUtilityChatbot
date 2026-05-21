@@ -1,0 +1,10 @@
+C:\Users\WESLEY\Desktop\2026-Capstone Projects\Mary Kija\agentic_whatsapp_bot\backend\config.py:95: RuntimeWarning: GROQ_API_KEY appears to be a test placeholder; Groq calls may fail.
+  warnings.warn(
+C:\Users\WESLEY\Desktop\2026-Capstone Projects\Mary Kija\agentic_whatsapp_bot\backend\config.py:100: RuntimeWarning: OPENROUTER_API_KEY appears to be a test placeholder; OpenRouter calls may fail.
+  warnings.warn(
+2026-02-16 14:27:46,386 - water_utility_bot - INFO - Starting Water Utility Chatbot with config: Config(host=127.0.0.1, port=8000, model=meta-llama/llama-3-8b-instruct, debug=True)
+2026-02-16 14:27:46,387 - water_utility_bot - INFO - Groq API key not configured (or test key in use). Using local intent fallback.
+INFO:     Started server process [21468]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8010 (Press CTRL+C to quit)

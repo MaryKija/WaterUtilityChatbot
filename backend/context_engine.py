@@ -207,7 +207,11 @@ class ContextManager:
         context["entities"] = entities
 
         # Set active agent based on intent
+<<<<<<< HEAD
         context["active_agent"] = self._map_intent_to_agent(context["intent"])
+=======
+        context["active_agent"] = self._map_intent_to_agent(context["intent"] or "")
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
         # Mark flow as started for service intents (not general_chat/out_of_scope)
         service_intents = ["report_fault", "leak_report", "billing_inquiry", "new_connection", "complaint_followup", "meter_problem"]
@@ -218,7 +222,11 @@ class ContextManager:
         return context
 
 
+<<<<<<< HEAD
     def update_context_with_step(self, context: dict, step: str | int, entities: dict = None) -> dict:
+=======
+    def update_context_with_step(self, context: dict, step: str | int, entities: Optional[dict] = None) -> dict:
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         """Update context with workflow step progress."""
         context["step"] = step
 
@@ -442,7 +450,11 @@ def summarize_if_needed(user_id: str, session: dict) -> dict:
 
     try:
         payload: Dict[str, Any] = {
+<<<<<<< HEAD
             "model": config.groq_model,
+=======
+            "model": config.cloud_model,
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -558,7 +570,11 @@ def _groq_extract_entities(message: str, session: dict) -> dict:
     }
 
     payload: Dict[str, Any] = {
+<<<<<<< HEAD
         "model": config.groq_model,
+=======
+        "model": config.cloud_model,
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": json.dumps(user)},
@@ -585,6 +601,7 @@ def _groq_extract_entities(message: str, session: dict) -> dict:
     # Normalize output.
     if isinstance(raw, dict) and "fields" in raw and isinstance(raw.get("fields"), dict):
         fields = raw.get("fields")
+<<<<<<< HEAD
         flat: dict[str, str] = {}
         for k, v in fields.items():
             if isinstance(v, dict):
@@ -595,6 +612,20 @@ def _groq_extract_entities(message: str, session: dict) -> dict:
                 continue
             flat[str(k)] = str(val)
         raw = flat
+=======
+
+        if isinstance(fields, dict):
+            flat: dict[str, str] = {}
+            for k, v in fields.items():
+                if isinstance(v, dict):
+                    val = v.get("value")
+                else:
+                    val = v
+                if val is None:
+                    continue
+                flat[str(k)] = str(val)
+            raw = flat
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     if not isinstance(raw, dict):
         return {}

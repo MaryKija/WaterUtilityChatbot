@@ -8,6 +8,12 @@ interface ChatHeaderProps {
 }
 
 const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
+<<<<<<< HEAD
+=======
+  // Hide confidence from customers, only show in debug mode
+  const isDebugMode = import.meta.env.DEV || window.location.search.includes('debug=true');
+  const showConfidence = isDebugMode && confidence;
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
   return (
     <div className="relative overflow-hidden bg-gradient-to-r from-primary to-[hsl(var(--chat-header-to))] px-5 py-5">
       {/* Subtle animated background pattern */}
@@ -31,16 +37,28 @@ const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
           className="flex items-center gap-2 text-primary-foreground">
 
           <Droplets className="h-5 w-5" />
+<<<<<<< HEAD
           <h1 className="text-lg font-semibold tracking-tight mx-0 my-0">WaterUtilityChatbot</h1>
+=======
+          <h1 className="text-lg font-semibold tracking-tight mx-0 my-0">LgWSC Assistant</h1>
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         </motion.div>
 
         <div className="min-w-[120px] rounded-lg bg-primary-foreground/10 px-3 py-2 text-right backdrop-blur-sm">
           <p className="text-xs font-medium text-primary-foreground/90">
             Intent: {intent}
           </p>
+<<<<<<< HEAD
           <p className="mt-0.5 text-[10px] text-primary-foreground/70">
             {confidence}
           </p>
+=======
+          {showConfidence && (
+            <p className="mt-0.5 text-[10px] text-primary-foreground/70">
+              {confidence}
+            </p>
+          )}
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         </div>
       </div>
     </div>);

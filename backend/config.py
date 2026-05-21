@@ -1,6 +1,7 @@
 """
 Configuration management for the Water Utility Chatbot.
 """
+<<<<<<< HEAD
 
 import os
 from pathlib import Path
@@ -8,14 +9,38 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+=======
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
+import socket
+import os
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+
+
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 class ConfigError(Exception):
     """Raised when configuration is invalid."""
 
 
 class Config:
     """Application configuration."""
+<<<<<<< HEAD
 
     def __init__(self) -> None:
+=======
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "") or "dummy"
+    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant") or "llama-3.1-8b-instant"
+    cloud_model: str = os.getenv("CLOUD_MODEL", "llama-3.1-8b-instant")  # Add this!
+    llm_provider: str = os.getenv("LLM_PROVIDER", "groq")
+    cors_origins: list = field(default_factory=lambda: ["*"])
+    debug: bool = os.getenv("DEBUG", "false").lower() == "true"
+
+    def __init__(self):
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         # Load .env file
         env_path = Path(__file__).resolve().parent.parent / ".env"
         # Override existing process env vars so edits to .env take effect on reload.
@@ -23,10 +48,18 @@ class Config:
         load_dotenv(dotenv_path=env_path, override=True, encoding="utf-8-sig")
 
         # Groq
+<<<<<<< HEAD
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         self.llm_provider = "groq"
         # NOTE: Groq periodically deprecates models. Keep a modern default here.
         self.groq_model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+=======
+        self.groq_api_key = os.getenv("GROQ_API_KEY", "") or ""
+        self.llm_provider = "groq"
+        # NOTE: Groq periodically deprecates models. Keep a modern default here.
+        self.local_model = "llama3.2:3b"
+        self.cloud_model = os.getenv("CLOUD_MODEL", "llama-3.1-8b-instant")
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
         # Server
         self.host = os.getenv("HOST", "127.0.0.1")
@@ -61,6 +94,19 @@ class Config:
 
         self._validate()
 
+<<<<<<< HEAD
+=======
+    @property
+    def is_online(self):
+        return bool(self.groq_api_key and self.groq_api_key != "dummy")
+            
+    def get_active_provider(self):
+        """Returns the available provider based on connectivity."""
+        return self.llm_provider
+
+            
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     def _validate(self) -> None:
         errors = []
 
@@ -83,7 +129,11 @@ class Config:
     def __repr__(self) -> str:
         return (
             f"Config(host={self.host}, port={self.port}, "
+<<<<<<< HEAD
             f"provider={self.llm_provider}, model={self.groq_model}, debug={self.debug})"
+=======
+            f"provider={self.llm_provider}, local_model={self.local_model}, cloud_model={self.cloud_model}, debug={self.debug})"
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         )
 
 

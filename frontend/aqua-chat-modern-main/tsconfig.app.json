@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "ignoreDeprecations": "6.0",
     "types": ["vitest/globals"],
+=======
+    "types": ["node"],
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
@@ -17,7 +21,12 @@
     "jsx": "react-jsx",
 
     /* Linting */
+<<<<<<< HEAD
     "strict": false,
+=======
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,

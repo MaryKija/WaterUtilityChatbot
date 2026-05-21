@@ -50,8 +50,14 @@ class StructuredFormatter(logging.Formatter):
         }
         
         # Add extra fields if present
+<<<<<<< HEAD
         if hasattr(record, "extra_data"):
             log_data.update(record.extra_data)
+=======
+        extra_data = getattr(record, "extra_data", None)
+        if extra_data and isinstance(extra_data, dict):
+            log_data.update(extra_data)
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         
         return json.dumps(log_data)
 
@@ -132,7 +138,11 @@ def log_with_context(logger: logging.Logger, level: str, message: str, **context
         exc_info=None
     )
     record.extra_data = context
+<<<<<<< HEAD
     getattr(logger, level.lower())(message, extra={"extra_data": context})
+=======
+    logger.info("User logged in", extra={"extra_data": {"user_id": 123}})
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 # Initialize logger

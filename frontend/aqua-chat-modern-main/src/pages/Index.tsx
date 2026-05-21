@@ -6,19 +6,32 @@ import TypingIndicator from "@/components/TypingIndicator";
 import ChatInput from "@/components/ChatInput";
 import WelcomeHero from "@/components/WelcomeHero";
 import type { ChatMessage } from "@/types/chat";
+<<<<<<< HEAD
 import { sendMessage, getChatUpdates, clearChat } from "@/services/api";
 import { Shield } from "lucide-react";
+=======
+import { sendMessage, getChatUpdates, clearChat, getSessionUserId } from "@/services/api";
+import { Droplets, Shield } from "lucide-react";
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 import { Link } from "react-router-dom";
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
+<<<<<<< HEAD
   text: "👋 Hello! I'm your **Water Utility Assistant**. I can help you with billing inquiries, water quality reports, service requests, and more. How can I help you today?",
+=======
+  text: "Hello! I'm the LgWSC Customer Service Assistant for Lukanga Water Supply and Sanitation Company. I can help you with billing inquiries, water quality reports, fault reporting, outage updates, and more. How can I help you today?",
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
   sender: "bot",
   timestamp: new Date(),
 };
 
 type ChatResponse = {
+<<<<<<< HEAD
   reply: string;
+=======
+  response: string;
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
   intent?: string;
   confidence?: number;
   tier?: string;
@@ -27,8 +40,24 @@ type ChatResponse = {
   escalated?: boolean;
 };
 
+<<<<<<< HEAD
 const Index = () => {
   const USER_ID = "demo-user";
+=======
+const RATING_EXCLUDED_INTENTS = new Set(["general_chat", "greeting", "escalation", "error"]);
+
+const suggestedFollowUps = [
+  { label: "Check my bill", query: "I want to check my bill balance" },
+  { label: "Report a fault", query: "I want to report a water fault" },
+  { label: "Water quality issue", query: "I want to report a water quality issue" },
+  { label: "Outage update", query: "I want an update about a water outage in Kabwe" },
+  { label: "Office hours", query: "What are the LgWSC office hours?" },
+  { label: "How to pay", query: "How do I pay my water bill?" },
+];
+
+const Index = () => {
+  const [userId] = useState(() => getSessionUserId());
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
   const [intent, setIntent] = useState("-");
@@ -36,6 +65,10 @@ const Index = () => {
   const [isEscalated, setIsEscalated] = useState(false);
   const [updatesAfter, setUpdatesAfter] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+<<<<<<< HEAD
+=======
+  const isInitialChat = messages.length <= 1 && !isTyping;
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -52,7 +85,11 @@ const Index = () => {
     const interval = window.setInterval(() => {
       void (async () => {
         try {
+<<<<<<< HEAD
           const data = (await getChatUpdates(USER_ID, updatesAfter)) as {
+=======
+          const data = (await getChatUpdates(userId, updatesAfter)) as {
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
             status: "none" | "WAITING" | "ACTIVE" | "CLOSED";
             messages: Array<{ sender: "user" | "bot" | "agent"; text: string; created_at?: string }>;
             next_after: number;
@@ -85,7 +122,11 @@ const Index = () => {
     }, 2000);
 
     return () => window.clearInterval(interval);
+<<<<<<< HEAD
   }, [isEscalated, updatesAfter]);
+=======
+  }, [isEscalated, updatesAfter, userId]);
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
   const handleSend = (text: string) => {
     const userMsg: ChatMessage = {
@@ -99,6 +140,7 @@ const Index = () => {
 
     void (async () => {
       try {
+<<<<<<< HEAD
         const data = (await sendMessage(text)) as ChatResponse;
         const botMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -109,6 +151,20 @@ const Index = () => {
         setMessages((prev) => [...prev, botMsg]);
 
         if (data.escalated === true || data.intent === "escalation") {
+=======
+        const data = (await sendMessage(text, userId)) as ChatResponse;
+        const isEscalation = data.escalated === true || data.intent === "escalation";
+        const botMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          text: data.response,
+          sender: "bot",
+          timestamp: new Date(),
+          showSatisfactionRating: !isEscalation && !RATING_EXCLUDED_INTENTS.has(data.intent ?? ""),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+
+        if (isEscalation) {
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
           setIsEscalated(true);
         }
 
@@ -118,10 +174,31 @@ const Index = () => {
         setConfidence(confPct != null ? `Confidence: ${confPct}%${data.tier ? ` (${data.tier})` : ""}` : data.tier ? `Tier: ${data.tier}` : "");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+<<<<<<< HEAD
+=======
+        const isNetworkError = msg.includes('fetch') || msg.includes('network') || msg.includes('ECONNREFUSED');
+        const isTimeoutError = msg.includes('timeout') || msg.includes('AbortError');
+        
+        let errorMessage = "I'm having trouble connecting right now.";
+        let errorAction = "Please try again in a moment.";
+        
+        if (isNetworkError) {
+          errorMessage = "Connection lost";
+          errorAction = "Please check your internet connection and try again.";
+        } else if (isTimeoutError) {
+          errorMessage = "Request timed out";
+          errorAction = "The service is taking longer than expected. Please try again.";
+        } else if (msg.includes('500')) {
+          errorMessage = "Service temporarily unavailable";
+          errorAction = "Our systems are experiencing issues. Please try again later.";
+        }
+        
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 2).toString(),
+<<<<<<< HEAD
             text:
               `I couldn't reach the backend. Please ensure FastAPI is running at http://127.0.0.1:8000 ` +
               `and that the Vite proxy is enabled.\n\nError: ${msg}`,
@@ -130,6 +207,15 @@ const Index = () => {
           },
         ]);
         setIntent("-");
+=======
+            text: `${errorMessage}\n\n${errorAction}\n\n_If this continues, please contact support or try speaking to an agent._`,
+            sender: "bot",
+            timestamp: new Date(),
+            showSatisfactionRating: false,
+          },
+        ]);
+        setIntent("error");
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         setConfidence("");
       } finally {
         setIsTyping(false);
@@ -139,7 +225,11 @@ const Index = () => {
 
   const handleClear = async () => {
     try {
+<<<<<<< HEAD
       await clearChat(USER_ID);
+=======
+      await clearChat(userId);
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
     } catch {
       // If clearing fails, still reset local UI state.
     }
@@ -178,9 +268,13 @@ const Index = () => {
 
         {/* Messages area */}
         <div className="chat-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto bg-chat-bg p-4">
+<<<<<<< HEAD
           {messages.length <= 1 && !isTyping && (
             <WelcomeHero onQuickAction={handleSend} />
           )}
+=======
+          {isInitialChat && <WelcomeHero />}
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
           {messages.map((msg, i) => (
             <MessageBubble key={msg.id} message={msg} index={i} />
           ))}
@@ -188,6 +282,30 @@ const Index = () => {
           <div ref={messagesEndRef} />
         </div>
 
+<<<<<<< HEAD
+=======
+        {isInitialChat && (
+          <div className="border-t border-border/60 bg-card px-4 py-2.5">
+            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground">
+              <Droplets className="h-3 w-3 text-primary" />
+              Quick actions
+            </div>
+            <div className="chat-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {suggestedFollowUps.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => handleSend(item.query)}
+                  className="shrink-0 rounded-full border border-border bg-chat-input-bg px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+>>>>>>> 9a7f394 (Initial clean commit for capstone project)
         <ChatInput onSend={handleSend} disabled={isTyping} />
       </motion.div>
     </div>

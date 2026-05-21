@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Utility Bot - Feedback</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .star-rating {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 2rem;
+        }
+        .star {
+            cursor: pointer;
+            color: #d1d5db;
+            transition: color 0.2s;
+        }
+        .star:hover,
+        .star.active {
+            color: #fbbf24;
+        }
+        .feedback-success {
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full mx-4">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <!-- Header -->
+            <div class="text-center mb-6">
+                <div class="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">How was this conversation?</h1>
+                <p class="text-gray-600">Your feedback helps us improve our service</p>
+            </div>
+
+            <!-- Feedback Form -->
+            <form id="feedbackForm" class="space-y-6">
+                <!-- Session ID (hidden) -->
+                <input type="hidden" id="sessionId" name="sessionId">
+                
+                <!-- User ID (hidden) -->
+                <input type="hidden" id="userId" name="userId">
+
+                <!-- Rating -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Rate your experience</label>
+                    <div class="star-rating justify-center" id="starRating">
+                        <span class="star" data-rating="1">★</span>
+                        <span class="star" data-rating="2">★</span>
+                        <span class="star" data-rating="3">★</span>
+                        <span class="star" data-rating="4">★</span>
+                        <span class="star" data-rating="5">★</span>
+                    </div>
+                    <input type="hidden" id="rating" name="rating" value="0" required>
+                </div>
+
+                <!-- Text Feedback -->
+                <div>
+                    <label for="textFeedback" class="block text-sm font-medium text-gray-700 mb-2">
+                        Additional feedback (optional)
+                    </label>
+                    <textarea 
+                        id="textFeedback" 
+                        name="textFeedback" 
+                        rows="4" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        placeholder="Tell us more about your experience..."
+                    ></textarea>
+                </div>
+
+                <!-- Helpful Checkbox -->
+                <div class="flex items-center">
+                    <input 
+                        type="checkbox" 
+                        id="helpful" 
+                        name="helpful" 
+                        checked
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    >
+                    <label for="helpful" class="ml-2 block text-sm text-gray-700">
+                        This was helpful
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                >
+                    <span id="submitText">Submit Feedback</span>
+                    <svg id="submitSpinner" class="animate-spin ml-2 h-4 w-4 text-white hidden" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="hidden mt-6 p-4 bg-green-50 border border-green-200 rounded-md feedback-success">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <h3 class="text-sm font-medium text-green-800">Thank you for your feedback!</h3>
+                        <p class="text-sm text-green-700 mt-1">We appreciate your input and will use it to improve our service.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let selectedRating = 0;
+
+        // Get URL parameters
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                sessionId: params.get('session_id') || '',
+                userId: params.get('user_id') || 'anonymous'
+            };
+        }
+
+        // Initialize form with URL parameters
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = getUrlParams();
+            document.getElementById('sessionId').value = params.sessionId;
+            document.getElementById('userId').value = params.userId;
+
+            // Initialize star rating
+            initializeStarRating();
+            
+            // Handle form submission
+            document.getElementById('feedbackForm').addEventListener('submit', handleSubmit);
+        });
+
+        function initializeStarRating() {
+            const stars = document.querySelectorAll('.star');
+            
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    const rating = parseInt(this.dataset.rating);
+                    setRating(rating);
+                });
+                
+                star.addEventListener('mouseenter', function() {
+                    const rating = parseInt(this.dataset.rating);
+                    highlightStars(rating);
+                });
+            });
+            
+            document.getElementById('starRating').addEventListener('mouseleave', function() {
+                highlightStars(selectedRating);
+            });
+        }
+
+        function setRating(rating) {
+            selectedRating = rating;
+            document.getElementById('rating').value = rating;
+            highlightStars(rating);
+        }
+
+        function highlightStars(rating) {
+            const stars = document.querySelectorAll('.star');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('active');
+                } else {
+                    star.classList.remove('active');
+                }
+            });
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            if (selectedRating === 0) {
+                showError('Please select a rating');
+                return;
+            }
+
+            const submitButton = event.target.querySelector('button[type="submit"]');
+            const submitText = document.getElementById('submitText');
+            const submitSpinner = document.getElementById('submitSpinner');
+            
+            // Show loading state
+            submitButton.disabled = true;
+            submitText.textContent = 'Submitting...';
+            submitSpinner.classList.remove('hidden');
+
+            try {
+                const formData = {
+                    session_id: document.getElementById('sessionId').value,
+                    user_id: document.getElementById('userId').value,
+                    rating: selectedRating,
+                    text_feedback: document.getElementById('textFeedback').value.trim() || null,
+                    helpful: document.getElementById('helpful').checked
+                };
+
+                const response = await fetch(`${API_BASE}/feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    showSuccess();
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                showError('Failed to submit feedback. Please try again.');
+            } finally {
+                // Reset loading state
+                submitButton.disabled = false;
+                submitText.textContent = 'Submit Feedback';
+                submitSpinner.classList.add('hidden');
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('feedbackForm').classList.add('hidden');
+            document.getElementById('successMessage').classList.remove('hidden');
+            
+            // Auto-close after 5 seconds
+            setTimeout(() => {
+                if (window.self !== window.top) {
+                    // If in iframe, send message to parent
+                    window.parent.postMessage('feedback-submitted', '*');
+                } else {
+                    window.close();
+                }
+            }, 5000);
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

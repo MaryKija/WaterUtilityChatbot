@@ -1,396 +1,416 @@
-## System Architecture
+# Water Utility Chatbot - System Architecture
 
-### High-Level Overview
+## High-Level Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         User Interface                          │
-│                    (HTML/CSS/JavaScript)                        │
-│                   WhatsApp-like Chat UI                         │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                    HTTP POST /chat
-                             │
-                             ▼
-┌───────────────────────────────────────────────────────────���─────┐
-│                      FastAPI Backend                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  main.py: Request Handler & Validation                  │  │
-│  │  - Receives chat requests                               │  │
-│  │  - Validates input (phone, message)                     │  │
-│  │  - Routes to intent classification                      │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                             │                                   │
-│                             ▼                                   │
-│  ┌─────────────────────────────────────────────────────────���┐  │
-│  │  Intent Classification (LLM-First)                      │  │
-│  │  - Primary: OpenRouter API (LLM)                        │  │
-│  ���  - Fallback 1: Local keyword detection                  │  │
-│  │  - Fallback 2: Ollama/DeepSeek                          │  │
-│  │  - Returns: intent, confidence, entities               │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                             │                                   │
-│                             ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  agent.py: Intent Router & Flow Manager                 │  │
-│  │  - Routes to appropriate handler                        │  │
-│  │  - Manages multi-turn conversation state                │  │
-│  │  - Extracts entities from user input                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                             │                                   │
-│        ┌─────────────────���──┼────────────────────┐              │
-│        ▼                    ▼                    ▼              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │
-│  │  tools.py    │  │  storage.py  │  │  validation  │         │
-│  │  (Actions)   │  │  (Database)  │  │  (Sanitize)  │         │
-│  └──────────────┘  └──────────────┘  └──────────────┘         │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                             │
-        ┌────────────────────┼��───────────────────┐
-        ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Frontend Layer                        │
+│  ┌─────────────────┐  ┌─────────────────┐         │
+│  │ Customer UI    │  │ Admin Dashboard │         │
+│  │ (React/Vite)   │  │  (HTML/JS)     │         │
+│  └─────────────────┘  └─────────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+                         │ HTTP API
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 FastAPI Backend                        │
+├─────────────────────────────────────────────────────────────┤
+│  • Authentication & Authorization (auth.py)             │
+│  • Request Routing & Validation (main.py)              │
+│  • Intent Classification (intent_pipeline.py)           │
+│  • Conversation Orchestration (orchestrator.py)         │
+│  • Tool Execution (tools.py)                          │
+│  • Data Storage (storage.py)                          │
+│  • Metrics Collection (metrics_collector.py)            │
+│  • Emergency Detection (emergency_detector.py)            │
+│  • Evaluation System (evaluation.py)                   │
+└─────────────────────────────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        ▼                ▼                ▼
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ OpenRouter   │  │   SQLite     │  │   Logging    │
-│   LLM API    │  │   Database   │  │   System     │
-└──────────────┘  └──────────────┘  └──────────────┘
+│   Groq LLM  │  │   SQLite DB  │  │   Admin UI  │
+│   (AI)      │  │  (Storage)   │  │ (Dashboard) │
+└──────────────┘  ┌──────────────┘  └──────────────┘
 ```
 
 ## Module Responsibilities
 
-### 1. **main.py** - Request Handler
-**Purpose**: Entry point for all chat requests
+### 1. **main.py** - FastAPI Application Entry Point
+**Purpose**: Central API server and request routing
 
-**Key Functions**:
-- `chat(data: ChatRequest)`: Main endpoint
-- `classify_intent(message: str)`: LLM-based intent classification
-- `_normalize_intent_result()`: Standardize intent output
-- `_extract_last_json_object()`: Parse LLM JSON responses
+**Key Components**:
+- FastAPI application setup and configuration
+- Request validation and error handling
+- Authentication endpoint routing
+- Static file serving for frontend
+- CORS and security middleware
+- Health check endpoints
 
-**Flow**:
-1. Receive chat request (phone, message)
-2. Validate input
-3. Classify intent using LLM
-4. Route to agent
-5. Return response with metadata
-
-### 2. **agent.py** - Intent Router & Flow Manager
-**Purpose**: Route intents to appropriate handlers and manage conversation state
-
-**Key Functions**:
-- `run_agent()`: Main routing logic
-- `_fill_complaint_fields_from_message()`: Extract complaint details
-- `_decline_out_of_scope()`: Handle unknown intents
-
-**Conversation Flows**:
-1. **Complaint Flow**: Collect name, area, issue → log complaint
-2. **Billing Flow**: Extract account number → retrieve bill
-3. **Follow-up Flow**: Extract ticket ID → get status
-4. **FAQ Flow**: Provide help information
-5. **Escalation Flow**: Transfer to human agent
-
-### 3. **tools.py** - Tool Implementations
-**Purpose**: Implement specific actions/tools
-
-**Tools**:
-- `log_complaint()`: Create complaint ticket
-- `get_complaint_status()`: Retrieve complaint status
-- `get_bill()`: Fetch billing information
-- `get_payment_methods()`: Payment options
-- `get_office_info()`: Office locations
-- `escalate_to_human()`: Escalation message
-
-### 4. **storage.py** - Database Layer
-**Purpose**: Persistent data storage
-
-**Functions**:
-- `init_db()`: Initialize SQLite schema
-- `create_complaint()`: Insert complaint
-- `get_complaint()`: Retrieve complaint by ID
-- `set_complaint_status()`: Update complaint status
-
-**Schema**:
-```sql
-CREATE TABLE water_complaints (
-    ticket_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    area TEXT NOT NULL,
-    issue TEXT NOT NULL,
-    status TEXT NOT NULL,
-    created_at TEXT NOT NULL
-)
-```
-
-### 5. **validation.py** - Input Validation
-**Purpose**: Validate and sanitize user input
-
-**Functions**:
-- `validate_phone_number()`: E.164 format validation
-- `validate_message()`: Length and content checks
-- `validate_account_number()`: Account format validation
-- `validate_ticket_id()`: Ticket format validation
-- `sanitize_input()`: Remove malicious content
-- `extract_account_number()`: Flexible account extraction
-- `extract_ticket_id()`: Flexible ticket extraction
-
-### 6. **config.py** - Configuration Management
-**Purpose**: Centralized configuration
-
-**Features**:
-- Load environment variables
-- Validate required settings
-- Provide configuration object
-- Generate API headers
-
-### 7. **logger.py** - Structured Logging
-**Purpose**: Centralized, structured logging
-
-**Features**:
-- JSON-formatted logs
-- Sensitive data filtering
-- Rotating file handlers
-- Separate error logs
-- Console output for development
-
-### 8. **intents.py** - Fallback Intent Detection
-**Purpose**: Keyword-based fallback for intent classification
-
-**Function**:
-- `detect_intent()`: Keyword matching for common intents
-
-## Data Flow
-
-### Complaint Reporting Flow
-
-```
-User Input: "No water in my area"
-    ↓
-[Validation] Phone & message validated
-    ↓
-[Intent Classification] LLM → "no_water_supply" (0.95 confidence)
-    ↓
-[Agent Routing] Complaint intent detected
-    ↓
-[Session Management] Initialize complaint flow
-    ↓
-[Entity Extraction] Extract name, area, issue
-    ↓
-[Validation] Check all required fields present
-    ↓
-[Tool Execution] log_complaint() → create ticket
-    ↓
-[Response] Return ticket ID and confirmation
-    ↓
-[Logging] Log action with metadata
-    ↓
-User Output: "✅ Complaint Logged Successfully
-              Reference Number: WC-A1B2C3"
-```
-
-### Billing Inquiry Flow
-
-```
-User Input: "Check my bill"
-    ↓
-[Intent Classification] LLM → "billing_inquiry" (0.90 confidence)
-    ↓
-[Agent Routing] Billing intent detected
-    ↓
-[Session Management] Initialize billing flow
-    ↓
-[Entity Extraction] Extract account number from message
-    ↓
-[Validation] Validate account number format
-    ↓
-[Tool Execution] get_bill(account_number)
-    ↓
-[Response] Return billing information
-    ↓
-User Output: "💳 Billing Information
-              Account: 123456
-              Amount Due: K245.60"
-```
-
-## Intent Classification Strategy
-
-### LLM-First Design
-
-The system uses a **LLM-first** approach rather than keyword matching:
-
-**Why?**
-- More natural language understanding
-- Handles variations and typos
-- Extracts entities automatically
-- Scales to new intents easily
-- Provides confidence scores
-
-**Process**:
-1. **Primary**: Send to OpenRouter LLM
-2. **Fallback 1**: Local keyword detection (intents.py)
-3. **Fallback 2**: Ollama/DeepSeek (if available)
-4. **Final**: Default to out_of_scope
-
-**Confidence Thresholds**:
-- High (0.9-1.0): Trust LLM classification
-- Medium (0.5-0.9): May need clarification
-- Low (<0.5): Likely out of scope
-
-## Session Management
-
-### Session State Structure
-
+**Major Endpoints**:
 ```python
-session = {
-    "flow": "complaint",              # Current flow type
-    "complaint_intent": "no_water_supply",
-    "name": "John",                   # Extracted fields
-    "area": "Makululu",
-    "issue": "No water supply",
-    "account_number": "123456",       # For billing
-    "ticket_id": "WC-A1B2C3",        # For follow-ups
-    "billing_intent": "billing_inquiry"
-}
+# Authentication
+POST /auth/login          # Admin authentication
+POST /auth/logout         # Token revocation
+
+# Customer Interface
+POST /chat               # Main chat endpoint
+POST /chat/clear         # Clear conversation history
+GET  /chat/updates       # Get conversation updates
+POST /feedback           # Submit user feedback
+
+# Admin Interface (Protected)
+GET  /admin/dashboard     # Dashboard metrics
+GET  /admin/complaints    # List all complaints
+GET  /admin/complaint/{id} # Get specific complaint
+GET  /admin/escalations   # List escalations
+GET  /admin/session/{id}   # Get session history
+POST /admin/resolution     # Manage resolutions
+
+# System
+GET  /health              # System health check
 ```
 
-### Flow Types
+### 2. **auth.py** - Authentication & Authorization System
+**Purpose**: Secure access control with role-based permissions
 
-1. **complaint**: Collecting complaint details
-2. **billing**: Collecting account information
-3. **followup**: Collecting ticket ID
-4. **None**: Single-turn interactions
+**Key Classes**:
+- `UserRole`: Enum (CUSTOMER, ADMIN, SUPER_ADMIN)
+- `Permission`: Enum (VIEW_DASHBOARD, MANAGE_RESOLUTIONS, etc.)
+- `AdminUser`: User authentication and session data
+- `AuthToken`: Token management and validation
+- `AuthService`: Core authentication logic
+- `PIIProtection`: Data redaction based on roles
 
-## Error Handling & Fallbacks
+**Security Features**:
+- Token-based authentication with expiration
+- Role-based access control (RBAC)
+- Permission system for granular access
+- Audit logging for all security events
+- PII redaction based on user roles
 
-### Fallback Chain
+### 3. **orchestrator.py** - Conversation Orchestration
+**Purpose**: Central conversation flow management and AI coordination
+
+**Key Functions**:
+- `process()`: Main conversation entry point
+- `_handle_new_intent()`: Intent classification and routing
+- `_route_to_agent()`: Agent selection based on intent
+- Session management and context tracking
+- Metrics collection integration
+- Emergency detection integration
+
+**Conversation Flow**:
+1. Receive user message and context
+2. Classify intent using LLM pipeline
+3. Route to appropriate agent/handler
+4. Execute tools and collect responses
+5. Update session metrics and context
+6. Return structured response with metadata
+
+### 4. **intent_pipeline.py** - Intent Classification System
+**Purpose**: AI-powered intent classification and entity extraction
+
+**Components**:
+- `IntentPipeline`: Main classification orchestrator
+- Rule-based pattern matching for common intents
+- LLM fallback for complex classification
+- Entity extraction (names, numbers, locations)
+- Confidence scoring and threshold management
+
+**Supported Intents**:
+- `no_water_supply`: Water outage reporting
+- `billing_inquiry`: Account and bill questions
+- `complaint_status`: Ticket tracking
+- `new_connection`: Service applications
+- `office_info`: Branch locations and hours
+- `escalation`: Human agent requests
+- `emergency`: Urgent situation detection
+
+### 5. **tools.py** - Tool Execution Layer
+**Purpose**: Implement specific actions and external system integrations
+
+**Available Tools**:
+```python
+# Complaint Management
+log_complaint(name, area, issue) -> Create complaint ticket
+get_complaint_status(ticket_id) -> Check ticket status
+get_complaint_details(ticket_id) -> Full complaint information
+
+# Billing Services
+get_bill(account_number) -> Retrieve billing information
+get_payment_methods() -> Available payment options
+get_payment_status(payment_id) -> Payment tracking
+
+# Customer Service
+get_office_info(branch_or_area) -> Branch locations and hours
+get_new_connection_info() -> Connection application process
+escalate_to_human(reason, details) -> Human handoff
+
+# Utility Services
+check_area_outage(area) -> Current outage status
+get_service_interruptions() -> Scheduled maintenance info
+```
+
+### 6. **storage.py** - Database Layer
+**Purpose**: Persistent data storage with comprehensive schema
+
+**Database Tables**:
+```sql
+-- Core Tables
+water_complaints          -- Customer complaints and tickets
+escalations               -- Human escalation records
+session_context           -- Conversation state management
+conversation_history      -- Full chat history with PII protection
+
+-- Mock Service Data
+mock_customers           -- Customer account information
+mock_accounts            -- Billing account details
+mock_bills              -- Invoice and payment data
+mock_payments           -- Payment transaction records
+mock_outages            -- Service outage information
+mock_offices             -- Branch location data
+
+-- Evaluation & Feedback
+session_metrics          -- Performance and usage analytics
+user_feedback           -- Customer satisfaction data
+admin_resolution         -- Case resolution tracking
+```
+
+**Key Functions**:
+- Database initialization and schema management
+- CRUD operations for all data types
+- Search and filtering capabilities
+- Data migration and seeding support
+
+### 7. **metrics_collector.py** - Performance Monitoring
+**Purpose**: Real-time system performance and user behavior tracking
+
+**Metrics Collected**:
+- Response times and latency
+- Intent classification accuracy
+- Conversation completion rates
+- User satisfaction scores
+- System error rates
+- Escalation frequency
+
+**Data Classes**:
+- `SessionMetrics`: Per-conversation performance data
+- `TurnMetrics`: Individual message interaction metrics
+- Real-time collection and storage
+
+### 8. **emergency_detector.py** - Emergency Detection
+**Purpose**: Identify urgent situations requiring immediate attention
+
+**Emergency Indicators**:
+- Medical emergency keywords
+- Safety and security threats
+- Urgent service disruptions
+- Life-threatening situations
+
+**Response Actions**:
+- Immediate escalation to human agents
+- Emergency contact information
+- Priority routing in admin dashboard
+- Alert notifications
+
+### 9. **evaluation.py** - Quality Assessment
+**Purpose**: System performance evaluation and quality metrics
+
+**Evaluation Components**:
+- Conversation quality scoring
+- Intent accuracy measurement
+- Response relevance assessment
+- User satisfaction analysis
+
+## Data Flow Architecture
+
+### Customer Chat Flow
 
 ```
-Try OpenRouter LLM
-    ↓ (fails)
-Try Local Keyword Detection
-    ↓ (fails)
-Try Ollama/DeepSeek
-    ↓ (fails)
-Return Default (out_of_scope)
+User Message → Frontend (React)
+       ↓
+HTTP POST /chat (JSON)
+       ↓
+Request Validation (main.py)
+       ↓
+Intent Classification (intent_pipeline.py)
+       ↓
+Conversation Orchestration (orchestrator.py)
+       ↓
+Tool Execution (tools.py)
+       ↓
+Database Operations (storage.py)
+       ↓
+Response Generation + Metrics Collection
+       ↓
+JSON Response → Frontend Display
 ```
 
-### Error Scenarios
+### Admin Dashboard Flow
 
-| Scenario | Handling |
-|----------|----------|
-| API timeout | Retry with fallback |
-| Invalid JSON | Parse last {...} object |
-| Missing fields | Prompt user for input |
-| Invalid phone | Normalize to E.164 |
-| Injection attempt | Sanitize input |
+```
+Admin Login → POST /auth/login
+       ↓
+Token Generation (auth.py)
+       ↓
+Role-Based Permission Check
+       ↓
+Access Grant/Deny
+       ↓
+Audit Logging
+       ↓
+Authenticated Requests → Admin Endpoints
+       ↓
+PII Redaction (auth.py) → Data Access (storage.py)
+       ↓
+Dashboard Display → Admin UI (static/admin.html)
+```
 
-## Security Considerations
+### Metrics Collection Flow
 
-### Input Validation
-- Phone number format validation
-- Message length limits (1-1000 chars)
-- Account number format validation
-- Ticket ID format validation
+```
+User Interaction → Conversation Processing
+       ↓
+Real-time Metrics (metrics_collector.py)
+       ↓
+Session Storage (storage.py)
+       ↓
+Dashboard Analytics → Admin Interface
+```
 
-### Data Protection
-- Sensitive data redacted in logs
-- API keys in environment variables
-- SQL injection prevention (parameterized queries)
-- CORS configuration
+## Security Architecture
 
-### Logging Security
-- Automatic redaction of: API keys, tokens, passwords, phone numbers, account numbers
-- Separate error logs for debugging
-- Rotating file handlers to prevent disk overflow
+### Authentication Flow
+```
+Login Request → Credential Validation
+       ↓
+Token Generation (JWT-like)
+       ↓
+Role-Based Permission Check
+       ↓
+Access Grant/Deny
+       ↓
+Audit Logging
+```
+
+### Data Protection Layers
+```
+User Request → Input Validation
+       ↓
+PII Detection → Role-Based Redaction
+       ↓
+Database Access (Parameterized Queries)
+       ↓
+Response Filtering → Secure Output
+```
+
+## Technology Stack
+
+### Backend Technologies
+- **FastAPI**: Modern Python web framework
+- **SQLite**: Lightweight database for development
+- **Groq API**: LLM for natural language processing
+- **Pydantic**: Data validation and serialization
+- **Uvicorn**: ASGI server for production
+
+### Frontend Technologies
+- **React**: Customer chat interface
+- **Vite**: Build tool and development server
+- **Tailwind CSS**: Utility-first styling
+- **HTML/JS**: Admin dashboard
+
+### Development Tools
+- **Python 3.9+**: Core runtime environment
+- **pytest**: Testing framework
+- **Logging**: Structured JSON logging system
+- **Environment Variables**: Configuration management
 
 ## Performance Considerations
 
-### Optimization Strategies
-
-1. **Greeting Short-Circuit**: Greetings handled locally (no LLM call)
-2. **Session Caching**: Store extracted entities in session
-3. **Fallback Efficiency**: Try fastest methods first
-4. **Timeout Management**: 30s timeout for LLM calls
-
 ### Scalability
+- **Database**: SQLite suitable for <10,000 records
+- **Concurrent Users**: Optimized for <100 simultaneous
+- **Memory Usage**: In-memory session storage
+- **API Rate Limits**: Configurable throttling
 
-- **In-Memory Sessions**: Works for demo; use Redis for production
-- **SQLite Database**: Suitable for small-medium scale
-- **Stateless API**: Can be horizontally scaled
+### Optimization Strategies
+- **Intent Caching**: Store classification results
+- **Session Management**: Efficient context tracking
+- **Database Indexing**: Optimized query performance
+- **Response Caching**: Reduce LLM API calls
 
-## Testing Strategy
+## Integration Points
 
-### Unit Tests
-- Input validation functions
-- Entity extraction
-- Intent normalization
-- Tool implementations
+### External Services
+- **Groq LLM**: Natural language processing
+- **Future WhatsApp**: Business API integration
+- **Payment Gateways**: Billing system integration
+- **Email Services**: Notification system
 
-### Integration Tests
-- Full conversation flows
-- Multi-turn interactions
-- Error scenarios
-- Fallback mechanisms
+### Internal Integrations
+- **Metrics Collection**: Real-time performance data
+- **Audit System**: Security event tracking
+- **Evaluation Engine**: Quality assessment
+- **Admin Dashboard**: Management interface
 
-### Manual Testing
-- `test_agent_flow.py`: Multi-turn conversation
-- `test_issue_fix.py`: Specific issue scenarios
-- `/test_llm` endpoint: API connectivity
+## Future WhatsApp Integration Architecture
 
-## Future Enhancements
-
-### Short-term (Phase 2-3)
-- [ ] Database for billing accounts
-- [ ] Database for office locations
-- [ ] Confidence threshold enforcement
-- [ ] Unit test coverage
-
-### Medium-term (Phase 4)
-- [ ] Redis for session storage
-- [ ] Rate limiting implementation
-- [ ] API versioning
-- [ ] Responsive frontend
-
-### Long-term (Phase 5)
-- [ ] Multi-language support
-- [ ] Sentiment analysis
-- [ ] Analytics dashboard
-- [ ] Advanced NLU models
-
-## Deployment Considerations
-
-### Development
-```bash
-uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+### Planned Integration
+```
+WhatsApp Business API → Webhook Endpoint
+       ↓
+Message Processing → Current Orchestrator
+       ↓
+WhatsApp Response → Formatted Output
+       ↓
+Media Support → File Handling
 ```
 
-### Production
-- Use production ASGI server (Gunicorn + Uvicorn)
-- Enable HTTPS
-- Use PostgreSQL instead of SQLite
-- Implement rate limiting
-- Set up monitoring and alerting
-- Use environment-specific configs
+### Integration Components
+- **Webhook Server**: WhatsApp message reception
+- **Message Adapter**: WhatsApp format conversion
+- **Media Handler**: Image and document processing
+- **Interactive Buttons**: WhatsApp UI elements
+- **WhatsApp Pay**: Payment processing integration
+
+## Deployment Architecture
+
+### Development Environment
+```
+Frontend Dev Server (Vite) :3000
+       ↓
+Backend Dev Server (Uvicorn) :8000
+       ↓
+SQLite Database (local file)
+```
+
+### Production Environment
+```
+Load Balancer → Multiple App Instances
+       ↓
+Application Servers (Gunicorn + Uvicorn)
+       ↓
+PostgreSQL Database (Cloud)
+       ↓
+Redis Cache (Session Storage)
+```
 
 ## Monitoring & Observability
 
-### Logging
-- Structured JSON logs in `logs/app.log`
-- Error logs in `logs/errors.log`
-- Automatic log rotation (10MB per file, 5 backups)
+### Logging Strategy
+- **Structured JSON Logs**: Consistent format across all modules
+- **Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Sensitive Data Redaction**: Automatic PII filtering
+- **Log Rotation**: Prevent disk overflow
+- **Error Tracking**: Separate error log files
 
-### Metrics to Track
-- Intent classification accuracy
-- Response time per request
-- Error rate by type
-- User satisfaction (future)
-
-### Debugging
-- Enable DEBUG mode in .env
-- Check logs for detailed traces
-- Use `/test_llm` endpoint for API testing
-- Review session state in logs
+### Metrics Dashboard
+- **Real-time Monitoring**: Live performance data
+- **Health Checks**: System status endpoints
+- **Alert System**: Error threshold notifications
+- **User Analytics**: Interaction patterns and satisfaction
 
 ---
 
-**This architecture supports the capstone project's goals of demonstrating agentic AI principles while maintaining simplicity and clarity.**
+**This architecture supports enterprise-grade deployment while maintaining simplicity and clarity for development and scaling.**
