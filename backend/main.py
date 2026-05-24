@@ -90,7 +90,7 @@ app.add_middleware(
 # Mount static files for production
 frontend_path = Path(__file__).parent.parent / "frontend" / "aqua-chat-modern-main" / "dist"
 if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+    app.mount("/assets", StaticFiles(directory=str(frontend_path)), name="assets")
 
 # Catch-all route to serve the frontend (SPA fallback)
 @app.get("/{full_path:path}")
