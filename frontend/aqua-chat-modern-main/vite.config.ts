@@ -4,7 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // Backend URL for the dev proxy; override with VITE_BACKEND_URL if needed.
-const BACKEND = process.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8000";
+const BACKEND = process.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }): UserConfig => ({
