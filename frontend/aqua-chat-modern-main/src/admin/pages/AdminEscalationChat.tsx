@@ -96,27 +96,18 @@ export default function AdminEscalationChat() {
           </div>
 
           <div className="grid gap-2">
-<<<<<<< HEAD
-            <div className="text-xs font-medium text-slate-600">Type reply…</div>
-            <textarea
-=======
             <label htmlFor="reply-input" className="text-xs font-medium text-slate-600">
               Type reply…
             </label>
             <textarea
               id="reply-input"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
               className="min-h-[90px] w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
               value={reply}
               onChange={(e) => setReply(e.target.value)}
             />
             <div className="flex justify-end">
               <button
-<<<<<<< HEAD
-                className="rounded-xl border border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-=======
                 className="rounded-xl border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-95"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 onClick={() => void onSend()}
               >
                 Send

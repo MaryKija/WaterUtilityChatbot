@@ -1,19 +1,13 @@
 import { motion } from "framer-motion";
 import { CheckCheck, Bot, User, Headset } from "lucide-react";
 import type { ChatMessage } from "@/types/chat";
-<<<<<<< HEAD
-=======
 import SatisfactionRating from "./SatisfactionRating";
 import { submitFeedback } from "@/services/api";
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 interface MessageBubbleProps {
   message: ChatMessage;
   index?: number;
-<<<<<<< HEAD
-=======
   key?: string | number;
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 }
 
 const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
@@ -104,8 +98,6 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
           <span>{time}</span>
           {isUser && <CheckCheck className="h-3 w-3 text-primary" />}
         </motion.div>
-<<<<<<< HEAD
-=======
 
         {message.showSatisfactionRating && (
           <motion.div
@@ -128,24 +120,17 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
             />
           </motion.div>
         )}
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
       </div>
     </motion.div>
   );
 };
 
 function formatMessage(text: string): string {
-<<<<<<< HEAD
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary font-semibold">$1</strong>')
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-=======
   // Strip any remaining markdown bold/italic markers that may come from the backend
   // and convert newlines to <br> for display. No colours, no highlights, no badges.
   return text
     .replace(/\*\*(.*?)\*\*/g, "$1")   // **bold** → plain
     .replace(/\*(.*?)\*/g, "$1")        // *italic* → plain
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     .replace(/\n/g, "<br />");
 }
 

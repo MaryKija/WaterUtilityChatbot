@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-=======
 const API_URL = import.meta.env.PROD
   ? (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "")
   : "";  // dev: use Vite proxy (no hardcoded port, no CORS issues)
@@ -21,32 +18,17 @@ export function adminLogout() {
   window.localStorage.removeItem("admin_role");
   window.location.replace("/admin/login");
 }
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-<<<<<<< HEAD
-=======
       ...getAdminAuthHeader(),
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
       ...(init?.headers || {}),
     },
   });
 
-<<<<<<< HEAD
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
-  }
-
-  return (await res.json()) as T;
-}
-
-export type ComplaintStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
-=======
   // Token expired or revoked — clear storage and redirect to login
   if (res.status === 401 || res.status === 403) {
     adminLogout();
@@ -79,15 +61,12 @@ export type ComplaintStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 
 export type ComplaintStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 export type ComplaintPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 export type ComplaintSummary = {
   ticket_id: string;
   issue: string;
   status: string;
   area: string;
-<<<<<<< HEAD
-=======
   name: string;
   created_at: string;
   updated_at: string;
@@ -95,7 +74,6 @@ export type ComplaintSummary = {
   category: string;
   priority: ComplaintPriority;
   sla_due_at: string | null;
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 };
 
 export type Complaint = {
@@ -106,15 +84,11 @@ export type Complaint = {
   status: string;
   created_at: string;
   updated_at: string;
-<<<<<<< HEAD
-  assigned_to: string | null;
-=======
   phone: string | null;
   assigned_to: string | null;
   category: string;
   priority: ComplaintPriority;
   sla_due_at: string | null;
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
   notes: Array<{ note: string; author: string; created_at: string }>;
 };
 
@@ -124,11 +98,8 @@ export type EscalationSummary = {
   user_id: string;
   reason: string;
   status: string;
-<<<<<<< HEAD
-=======
   priority: string;
   created_at: string;
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
   updated_at: string;
 };
 
@@ -143,9 +114,6 @@ export type Escalation = {
   updated_at: string;
 };
 
-<<<<<<< HEAD
-export const adminApi = {
-=======
 export type FeedbackItem = {
   feedback_id: string;
   session_id: string;
@@ -174,7 +142,6 @@ export type DashboardMetrics = {
 
 export const adminApi = {
   getDashboard: () => http<DashboardMetrics>("/admin/dashboard"),
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
   listComplaints: () => http<ComplaintSummary[]>("/admin/complaints"),
   getComplaint: (ticketId: string) => http<Complaint>(`/admin/complaints/${encodeURIComponent(ticketId)}`),
   updateComplaintStatus: (ticketId: string, status: ComplaintStatus) =>
@@ -187,8 +154,6 @@ export const adminApi = {
       `/admin/complaints/${encodeURIComponent(ticketId)}/note`,
       { method: "POST", body: JSON.stringify({ note }) },
     ),
-<<<<<<< HEAD
-=======
   assignComplaint: (ticketId: string, assignedTo: string) =>
     http<{ success: boolean; complaint: Complaint }>(
       `/admin/complaints/${encodeURIComponent(ticketId)}/assign`,
@@ -200,7 +165,6 @@ export const adminApi = {
       { method: "POST", body: JSON.stringify({ priority }) },
     ),
   listFeedback: (limit = 20) => http<FeedbackItem[]>(`/admin/feedback?limit=${encodeURIComponent(String(limit))}`),
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
   listEscalations: () => http<EscalationSummary[]>("/admin/escalations"),
   getEscalation: (escalationId: string) => http<Escalation>(`/admin/escalations/${encodeURIComponent(escalationId)}`),

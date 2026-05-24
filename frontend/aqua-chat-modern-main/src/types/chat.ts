@@ -3,8 +3,5 @@ export interface ChatMessage {
   text: string;
   sender: "user" | "bot" | "agent";
   timestamp: Date;
-<<<<<<< HEAD
-=======
   showSatisfactionRating?: boolean;
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 }

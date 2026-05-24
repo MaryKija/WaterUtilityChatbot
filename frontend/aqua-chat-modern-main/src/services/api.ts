@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-const API_URL = "/api";
-
-export async function sendMessage(message: string) {
-  const response = await fetch(`${API_URL}/chat`, {
-=======
 /**
  * api.ts — Frontend API client
  *
@@ -39,29 +33,12 @@ export function getSessionUserId(): string {
 
 export async function sendMessage(message: string, userId?: string) {
   const res = await fetch(`${API_URL}/chat`, {
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       message: message,
-<<<<<<< HEAD
-      user_id: "demo-user",
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Backend error (${response.status}): ${detail || response.statusText}`);
-  }
-
-  return response.json();
-}
-
-export async function clearChat(userId: string = "demo-user") {
-  const response = await fetch(`${API_URL}/chat/clear`, {
-=======
       user_id: userId ?? getSessionUserId(),
     }),
   });
@@ -77,22 +54,10 @@ export async function clearChat(userId: string = "demo-user") {
 export async function clearChat(userId?: string) {
   const uid = userId ?? getSessionUserId();
   const res = await fetch(`${API_URL}/chat/clear`, {
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-<<<<<<< HEAD
-    body: JSON.stringify({ user_id: userId }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Backend error (${response.status}): ${detail || response.statusText}`);
-  }
-
-  return response.json();
-=======
     body: JSON.stringify({ user_id: uid }),
   });
 
@@ -102,7 +67,6 @@ export async function clearChat(userId?: string) {
   }
 
   return res.json();
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 }
 
 export async function getChatUpdates(userId: string, after: number) {
@@ -111,16 +75,6 @@ export async function getChatUpdates(userId: string, after: number) {
     after: String(after ?? 0),
   });
 
-<<<<<<< HEAD
-  const response = await fetch(`${API_URL}/chat/updates?${params.toString()}`);
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Backend error (${response.status}): ${detail || response.statusText}`);
-  }
-
-  return response.json();
-=======
   const res = await fetch(`${API_URL}/chat/updates?${params.toString()}`);
 
   if (!res.ok) {
@@ -162,5 +116,4 @@ export async function submitFeedback({
   }
 
   return res.json();
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 }
