@@ -92,15 +92,26 @@ frontend_path = Path(__file__).parent.parent / "frontend" / "aqua-chat-modern-ma
 if frontend_path.exists():
     app.mount("/assets", StaticFiles(directory=str(frontend_path)), name="assets")
 
-# Catch-all route to serve the frontend (SPA fallback)
+# Explicit root route - serve index.html directly
+@app.get("/")
+async def serve_index():
+    index_file = frontend_path / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    raise HTTPException(status_code=404, detail="Frontend not built")
+
+# Catch-all route - only for non-asset paths
 @app.get("/{full_path:path}")
 async def serve_frontend(full_path: str):
-    #Only block API routes
+    # Skip API routes
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     
-    #Admin SPA
-    # Check if it's an admin route
+    # Skip asset requests - let static mount handle them
+    if full_path.startswith("assets/"):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Admin SPA
     if full_path == "admin" or full_path == "admin/":
         admin_path = Path(__file__).parent.parent / "frontend" / "admin" / "dist"
         index_file = admin_path / "index.html"
