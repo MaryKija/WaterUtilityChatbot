@@ -73,14 +73,6 @@ class IntentPipeline:
             "report_fault": [
                 r"\b(no\s+water|water\s+is\s+off|water\s+cut|water\s+outage)\b",
                 r"\b(leak|leaking|burst\s+pipe|burst\s+water\s+pipe|pipe\s+burst)\b",
-<<<<<<< HEAD
-                r"\b(dirty\s+water|water\s+is\s+dirty|contaminated\s+water)\b",
-                r"\b(low\s+pressure|water\s+pressure\s+low)\b",
-            ],
-            "complaint_followup": [
-                r"\b(ticket|reference|wc-|status|check|update)\b",
-                r"\b(complaint|issue|problem|fault)\b.*\b(status|update|check)\b",
-=======
                 r"\b(dirty\s+water|water\s+is\s+dirty|contaminated\s+water|water\s+quality|smelly\s+water|bad\s+taste|unsafe\s+water)\b",
                 r"\b(low\s+pressure|water\s+pressure\s+low)\b",
             ],
@@ -89,16 +81,12 @@ class IntentPipeline:
                 r"\b(complaint|issue|problem|fault)\b.*\b(status|update|check)\b",
                 r"\b(status|check)\b.*\b(complaint|ticket|reference)\b",
                 r"\bmy\s+(complaint|ticket|report)\b",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             ],
             "escalation": [
                 r"\b(speak\s+to|talk\s+to|connect\s+me|transfer\s+me)\b.*\b(agent|person|human|representative)\b",
                 r"\b(agent|human|person|representative|manager|supervisor)\b",
-<<<<<<< HEAD
-=======
                 r"\b(human\s+agent|request\s+human\s+agent|need\s+human\s+agent)\b",
                 r"\b(speak\s+with\s+human|talk\s+with\s+human|human\s+help)\b",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             ],
             "office_info": [
                 r"\b(office|location|address|hours|open|close|contact|phone|email)\b",
@@ -114,8 +102,6 @@ class IntentPipeline:
             ],
         }
 
-<<<<<<< HEAD
-=======
     def _billing_inquiry_priority(self, message_lower: str) -> bool:
         """Strong billing phrases that must not be misrouted to fault/complaint flows."""
         patterns = [
@@ -177,13 +163,10 @@ class IntentPipeline:
         words = message_lower.split()
         return bool(words) and len(words) <= 6
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     def classify(self, message: str, context: dict) -> dict:
         """Run advanced hybrid intent classification pipeline with ensemble voting."""
         message_lower = message.lower().strip()
 
-<<<<<<< HEAD
-=======
         # Hard priority: outage information requests must not route to complaint intake
         # e.g. "I want an update about a water outage" → report_fault (outage lookup)
         if self._outage_info_priority(message_lower):
@@ -228,7 +211,6 @@ class IntentPipeline:
                 "source": "rule_billing_continuation",
             }
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         # Step 1: Extract entities
         entities = self._extract_entities(message, context)
 
@@ -265,17 +247,12 @@ class IntentPipeline:
         if ticket_match:
             entities["ticket_id"] = ticket_match.group(1).upper()
 
-<<<<<<< HEAD
-        # Extract location/area mentions
-        area_keywords = ["kabwe", "lusaka", "ndola", "kitwe", "livingstone", "chingola", "mufulira"]
-=======
         # Extract location/area mentions — LgWSC service areas (Central Province, Zambia)
         area_keywords = [
             "kabwe", "kapiri mposhi", "kapiri", "mkushi", "serenje", "chibombo",
             "chisamba", "mumbwa", "shibuyunji", "itezhi-tezhi", "itezhi tezhi",
             "chitambo", "luano", "ngabwe",
         ]
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         for area in area_keywords:
             if area in message_lower:
                 entities["area"] = area.capitalize()
@@ -287,35 +264,19 @@ class IntentPipeline:
             entities["account_number"] = account_match.group(0)
 
         account_match = re.search(r"\b\d{6}\b", message_lower)
-<<<<<<< HEAD
-        account_number = account_match.group(0) if account_match else None 
-
-        if any(re.search(kw, message_lower) for kw in billing_keywords):
-            return {
-                "intent": "billing_inquiry",
-                "confidence": 0.95,
-                "entities": {"account_number": account_number}, # Now it's captured!
-                "source": "lightweight"
-            }
-=======
         account_number = account_match.group(0) if account_match else None
 
         if any(re.search(kw, message_lower) for kw in billing_keywords):
             if account_number:
                 entities["account_number"] = account_number
             return entities
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
         # Extract named entities for complaint details
         if "leak" in message_lower or "burst" in message_lower:
             entities["fault_type"] = "leak" if "leak" in message_lower else "burst_pipe"
         elif "no water" in message_lower or "outage" in message_lower:
             entities["fault_type"] = "outage"
-<<<<<<< HEAD
-        elif "dirty" in message_lower or "contaminated" in message_lower:
-=======
         elif any(term in message_lower for term in ["dirty", "contaminated", "water quality", "smelly", "bad taste", "unsafe"]):
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             entities["fault_type"] = "water_quality"
         elif "pressure" in message_lower:
             entities["fault_type"] = "low_pressure"
@@ -472,13 +433,8 @@ class IntentPipeline:
                 "source": "lightweight"
             }
 
-<<<<<<< HEAD
-        # Check for follow-up
-        followup_keywords = ["ticket", "reference", "wc-", "status", "check", "update"]
-=======
         # Check for follow-up — require ticket/reference context, not just "update"
         followup_keywords = ["ticket", "reference", "wc-", "my complaint", "my ticket"]
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         if any(word in message_lower for word in followup_keywords):
             return {
                 "intent": "complaint_followup",
@@ -486,19 +442,10 @@ class IntentPipeline:
                 "entities": {},
                 "source": "lightweight"
             }
-<<<<<<< HEAD
-
-        # Check for new connection
-        connection_keywords = ["new connection", "apply for connection", "set up connection"]
-        if any(phrase in message_lower for phrase in connection_keywords):
-            return {
-                "intent": "new_connection",
-=======
         # "status" alone is a followup signal only when paired with complaint language
         if "status" in message_lower and any(w in message_lower for w in ["complaint", "ticket", "report", "issue"]):
             return {
                 "intent": "complaint_followup",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 "confidence": 0.8,
                 "entities": {},
                 "source": "lightweight"
@@ -522,19 +469,6 @@ class IntentPipeline:
         }
 
     def _llm_classify(self, message: str, context: dict) -> dict:
-<<<<<<< HEAD
-        """LLM-based classification for complex cases."""
-        try:
-            return groq_classify_intent(message, context)
-        except Exception as e:
-            logger.warning(f"LLM classification failed: {e}")
-            return {
-                "intent": "out_of_scope",
-                "confidence": 0.1,
-                "entities": {},
-                "source": "llm"
-            }
-=======
         """LLM-based classification for complex cases.
 
         Falls back to the offline keyword classifier when Groq is unreachable
@@ -557,7 +491,6 @@ class IntentPipeline:
             result = classify_offline(message)
             result["source"] = "llm"
             return result
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     def _arbitrate(self, results: list[dict]) -> dict:
         """Legacy method - kept for compatibility. Use ensemble_vote instead."""

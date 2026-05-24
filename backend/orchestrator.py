@@ -10,140 +10,6 @@ Coordinates:
 - Tool execution
 - Response generation
 """
-<<<<<<< HEAD
-
-from __future__ import annotations
-
-import re
-from typing import Any, Dict, Optional
-from datetime import datetime
-
-from .agent import run_agent
-from .context_engine import context_manager, extract_entities
-from .intent_pipeline import intent_pipeline
-from .logger import logger
-from .tool_executor import tool_executor
-from .validators import is_valid_name
-
-
-class Orchestrator:
-    """Central orchestrator for conversation requests."""
-
-    def __init__(self):
-        self.agents = {
-            "complaint_agent": ComplaintAgent(),
-            "billing_agent": BillingAgent(),
-            "connection_agent": ConnectionAgent(),
-            "info_agent": InfoAgent(),
-            "general_agent": GeneralAgent(),
-            "human_agent": HumanAgent(),
-        }
-
-    def handle_request(self, user_id: str, message: str) -> dict:
-        """Handle a conversation request."""
-        # Load context
-        context = context_manager.load_context(user_id)
-
-        # Clear context when user explicitly asks to reset
-        command = message.strip().lower()
-        if command in ("clear", "reset", "start over", "new conversation", "restart"):
-            context = context_manager.reset_context(context)
-            context_manager.save_context(user_id, context)
-            return {
-                "reply": "Conversation reset. How can I help you today?",
-                "intent": None,
-                "confidence": 1.0,
-                "entities": {},
-                "active_agent": None,
-                "escalated": False,
-            }
-
-        # Update context with user message
-        context = context_manager.update_context_with_history(context, "user", message)
-
-
-        extracted = extract_entities(message)
-        if extracted:
-            entities = context.get("entities", {})
-            entities.update(extracted)
-            context["entities"] = entities
-            logger.info(f"Extracted entities: {extracted}")
-
-        # Clear context when user explicitly asks to reset
-        command = message.strip().lower()
-        if command in ("clear", "reset", "start over", "new conversation", "restart"):
-            context = context_manager.reset_context(context)
-            context_manager.save_context(user_id, context)
-            return {
-                "reply": "Conversation reset. How can I help you today?",
-                "intent": None,
-                "confidence": 1.0,
-                "entities": {},
-                "active_agent": None,
-                "escalated": False,
-            }
-
-        # FLOW LOCK: If active_agent AND flow_started, BYPASS classification
-        if (context.get("active_agent") and context.get("flow_started", False)):
-            logger.info(f"Flow locked: {context['active_agent']}")
-            agent_name = context["active_agent"]
-            agent = self.agents.get(agent_name, self.agents["general_agent"])
-            response = self._handle_with_agent(agent, message, context)
-        elif context_manager.should_classify_intent(context):
-            # Classify + route
-            intent_result = intent_pipeline.classify(message, context)
-            logger.info(f"Classified: {intent_result['intent']} ({intent_result['confidence']:.2f})")
-            
-            context = context_manager.update_context_with_intent(context, intent_result)
-            
-            # Check escalation first
-            if context_manager.should_escalate(context, intent_result.get("confidence", 0), 0):
-                context = context_manager.escalate_context(context, "low_confidence")
-                agent = self.agents["human_agent"]
-            else:
-                agent_name = context.get("active_agent", "general_agent")
-                agent = self.agents.get(agent_name, self.agents["general_agent"])
-
-            response = self._handle_with_agent(agent, message, context)
-        else:
-            agent = self.agents["general_agent"]
-            response = self._handle_with_agent(agent, message, context)
-        # Update context with bot response
-        context = context_manager.update_context_with_history(context, "bot", response)
-
-        # Save context
-        context_manager.save_context(user_id, context)
-
-        return {
-            "reply": response,
-            "intent": context.get("intent"),
-            "confidence": context.get("confidence"),
-            "entities": context.get("entities", {}),
-            "active_agent": context.get("active_agent"),
-            "escalated": context.get("escalated", False),
-        }
-
-    def _handle_with_agent(self, agent, message: str, context: dict) -> str:
-        """Handle request with specific agent."""
-        # Get agent decision
-        decision = agent.handle(message, context)
-
-        # Check if tool execution is needed
-        if decision.get("requires_tool"):
-            tool_result = tool_executor.execute(
-                decision["tool_name"],
-                decision.get("parameters", {}),
-                context
-            )
-
-            # Pass tool result back to agent for final response
-            final_decision = agent.handle_with_tool_result(message, context, tool_result)
-            return final_decision.get("reply", "I apologize, but I encountered an error.")
-
-        # No tool needed, return direct response
-        return decision.get("reply", "I apologize, but I encountered an error.")
-
-=======
 from __future__ import annotations
 from abc import abstractmethod
 
@@ -178,18 +44,10 @@ from .validators import is_valid_name
 from .metrics_collector import metrics_collector
 from .emergency_detector import emergency_detector
 from .tools import _fmt_datetime
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 class BaseAgent:
     """Base agent class."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-        """Handle message and return decision."""
-        raise NotImplementedError
-
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-=======
     @abstractmethod
     async def handle(self, message: str, context: dict) -> dict:
         """Handle message and return decision."""
@@ -197,7 +55,6 @@ class BaseAgent:
 
     @abstractmethod
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         """Handle message with tool result."""
         raise NotImplementedError
 
@@ -235,15 +92,12 @@ class ComplaintAgent(BaseAgent):
         "water",
     }
 
-<<<<<<< HEAD
-=======
     _TICKET_ID_RE = re.compile(r"\b(WC-[A-Z0-9]{6})\b", re.IGNORECASE)
 
     def _ticket_id_from_message(self, message: str) -> Optional[str]:
         m = self._TICKET_ID_RE.search(message or "")
         return m.group(1).upper() if m else None
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     def _capture_step_reply(self, message: str, context: dict, entities: dict) -> None:
         """Capture direct replies for the field we are actively collecting."""
         step = str(context.get("step") or "")
@@ -251,48 +105,11 @@ class ComplaintAgent(BaseAgent):
         if not raw:
             return
 
-<<<<<<< HEAD
-        if not entities.get("name") and step == "collect_name":
-            maybe_name = self._extract_name_reply(raw)
-            if maybe_name:
-                entities["name"] = maybe_name
-
-        if not entities.get("area"):
-            if entities.get("address"):
-                entities["area"] = entities["address"]
-            elif step == "collect_area":
-                entities["area"] = raw
-
-=======
         # Always try to infer issue from any message — user may repeat their problem
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         if not entities.get("issue"):
             inferred_issue = self._infer_issue(raw, context)
             if inferred_issue:
                 entities["issue"] = inferred_issue
-<<<<<<< HEAD
-            elif step == "collect_issue":
-                entities["issue"] = raw
-
-    def _extract_name_reply(self, raw: str) -> Optional[str]:
-        if any(ch.isdigit() for ch in raw):
-            return None
-
-        explicit_match = re.search(
-            r"(?:my\s+name\s+is|i\s+am|i'm|name\s*[:=-]?)\s*([A-Za-z][A-Za-z\s'\-\.]{1,58})$",
-            raw,
-            flags=re.IGNORECASE,
-        )
-        candidate = explicit_match.group(1).strip() if explicit_match else raw.strip()
-        tokens = re.findall(r"[A-Za-z][A-Za-z'\-\.]*", candidate)
-        if not 2 <= len(tokens) <= 4:
-            return None
-        if any(token.lower() in self._NAME_STOPWORDS for token in tokens):
-            return None
-
-        normalized = " ".join(tokens)
-        return normalized if is_valid_name(normalized) else None
-=======
 
         # Snapshot which fields were already present BEFORE this call so that
         # "next missing field" fallbacks don't cascade within a single turn.
@@ -347,30 +164,11 @@ class ComplaintAgent(BaseAgent):
         return None
 
         
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     def _infer_issue(self, message: str, context: dict) -> Optional[str]:
         lowered = (message or "").lower()
         intent = str(context.get("intent") or "")
 
-<<<<<<< HEAD
-        if "leak" in lowered:
-            return "Water leak"
-        if "outage" in lowered or "no water" in lowered or "no supply" in lowered:
-            return "Water outage"
-        if "low pressure" in lowered:
-            return "Low water pressure"
-        if "burst" in lowered or "pipe" in lowered:
-            return "Pipe fault"
-        if intent == "leak_report":
-            return "Water leak"
-        return None
-
-    def handle(self, message: str, context: dict) -> dict:
-        entities = context.setdefault("entities", {})
-        self._capture_step_reply(message, context, entities)
-
-=======
         # Check most specific patterns first to avoid misclassification
         if any(term in lowered for term in ["dirty", "contaminated", "water quality", "smelly",
                                              "bad taste", "unsafe", "quality issue", "quality problem",
@@ -475,15 +273,10 @@ class ComplaintAgent(BaseAgent):
             if intent in issue_map:
                 entities["issue"] = issue_map[intent]
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         current_field = next((field for field in self._COMPLAINT_FIELDS if not entities.get(field)), None)
 
         if current_field == "name":
             context_manager.update_context_with_step(context, "collect_name")
-<<<<<<< HEAD
-            return {
-                "reply": "I can help report this issue. Please provide your full name.",
-=======
             # Clear stale complaint entities from any previous session so they
             # don't bleed into this new complaint (e.g. old issue="Water leak"
             # overwriting a new "water quality" report).
@@ -505,34 +298,19 @@ class ComplaintAgent(BaseAgent):
             context_manager.save_context(context.get("user_id", "unknown"), context)
             return {
                 "reply": "I can help report this issue. What is your full name?",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 "requires_tool": False
             }
 
         if current_field == "area":
             context_manager.update_context_with_step(context, "collect_area")
-<<<<<<< HEAD
-            return {
-                "reply": "Please provide the area or address where the issue is occurring (e.g., 'Mulungushi Road House 434').",
-=======
             context_manager.save_context(context.get("user_id", "unknown"), context)
             return {
                 "reply": "What area or address is the issue occurring at? (e.g. 'Mulungushi Road, House 434')",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 "requires_tool": False
             }
 
         if current_field == "issue":
             context_manager.update_context_with_step(context, "collect_issue")
-<<<<<<< HEAD
-            return {
-                "reply": "Please describe the water issue (no water, low pressure, leak, etc.).",
-                "requires_tool": False
-            }
-
-        # All info collected or meter provided, log complaint
-        context_manager.update_context_with_step(context, "log_complaint")
-=======
             context_manager.save_context(context.get("user_id", "unknown"), context)
             return {
                 "reply": "Please describe the water issue (e.g. no water, low pressure, leak).",
@@ -542,7 +320,6 @@ class ComplaintAgent(BaseAgent):
         # All info collected — log the complaint
         context_manager.update_context_with_step(context, "log_complaint")
         context_manager.save_context(context.get("user_id", "unknown"), context)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {
             "reply": "Logging your complaint now...",
             "requires_tool": True,
@@ -555,11 +332,6 @@ class ComplaintAgent(BaseAgent):
             }
         }
 
-<<<<<<< HEAD
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        context_manager.reset_context(context)
-        return {"reply": tool_result or "Your complaint WC-XXXXXX has been logged. Our team will investigate within 24 hours."}
-=======
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
         # Do not call reset_context here — it wiped ticket_id and forced users back into
         # intake. Flow flags are cleared in ToolExecutor after log_complaint / status.
@@ -591,28 +363,21 @@ class ComplaintAgent(BaseAgent):
                 }
         
         return {"reply": tool_result or "Your complaint has been logged. Our team will investigate within 24 hours."}
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 class BillingAgent(BaseAgent):
     """Agent for handling billing inquiries - integrated with agent.py logic."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-=======
     _GRATITUDE_OR_CLOSE = re.compile(
         r"^(thanks?|thank\s+you|thx|thanx|much\s+appreciated|cheers|ok\s*,?\s*thanks|ta)[\s!.]*$",
         re.IGNORECASE,
     )
 
     async def handle(self, message: str, context: dict) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         from .agent import run_agent
         from .intent_pipeline import intent_pipeline
         from .context_engine import extract_entities
 
-<<<<<<< HEAD
-=======
         raw = (message or "").strip()
         # Billing stays flow-locked on billing_agent; short thanks must not re-run bill + payment blocks.
         entities_existing = context.get("entities") or {}
@@ -626,7 +391,6 @@ class BillingAgent(BaseAgent):
                 "requires_tool": False,
             }
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         # Extract intent (billing_inquiry)
         intent_data = {
             "intent": "billing_inquiry",
@@ -648,22 +412,14 @@ class BillingAgent(BaseAgent):
 
         return {"reply": reply, "requires_tool": False}
 
-<<<<<<< HEAD
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-=======
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {"reply": tool_result or "Billing check complete."}
 
 
 class ConnectionAgent(BaseAgent):
     """Agent for handling new connections."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-=======
     async def handle(self, message: str, context: dict) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         entities = context.get("entities", {})
         step_str = str(context.get("step", "0"))
         step = int(step_str)
@@ -679,10 +435,7 @@ class ConnectionAgent(BaseAgent):
                 "email": "Please provide your email (optional)."
             }
             context_manager.update_context_with_step(context, str(step + 1))
-<<<<<<< HEAD
-=======
             context_manager.save_context(context.get("user_id", "unknown"), context)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             return {
                 "reply": prompts[current_field],
                 "requires_tool": False
@@ -690,10 +443,7 @@ class ConnectionAgent(BaseAgent):
 
         # All fields collected, create connection request
         context_manager.update_context_with_step(context, "create_connection")
-<<<<<<< HEAD
-=======
         context_manager.save_context(context.get("user_id", "unknown"), context)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {
             "reply": "Processing your new connection request...",
             "requires_tool": True,
@@ -701,11 +451,7 @@ class ConnectionAgent(BaseAgent):
             "parameters": entities
         }
 
-<<<<<<< HEAD
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-=======
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         context_manager.reset_context(context)
         return {"reply": tool_result}
 
@@ -713,11 +459,7 @@ class ConnectionAgent(BaseAgent):
 class InfoAgent(BaseAgent):
     """Agent for handling information requests."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-=======
     async def handle(self, message: str, context: dict) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {
             "reply": "Getting office information...",
             "requires_tool": True,
@@ -725,11 +467,7 @@ class InfoAgent(BaseAgent):
             "parameters": {}
         }
 
-<<<<<<< HEAD
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-=======
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         context_manager.reset_context(context)
         return {"reply": tool_result}
 
@@ -737,22 +475,6 @@ class InfoAgent(BaseAgent):
 class GeneralAgent(BaseAgent):
     """Agent for general chat and out-of-scope requests."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-        from .llm.groq_client import generate_response
-
-        response = generate_response(
-            message,
-            context,
-            intent="general_chat",
-            max_tokens=140
-        )
-
-        context_manager.reset_context(context)
-        return {"reply": response}
-
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-=======
     async def handle(self, message: str, context: dict) -> dict:
         from .llm.groq_client import generate_response
 
@@ -778,32 +500,18 @@ class GeneralAgent(BaseAgent):
         return {"reply": response}
 
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {"reply": "I apologize, but I encountered an error."}
 
 
 class HumanAgent(BaseAgent):
     """Agent for escalated conversations."""
 
-<<<<<<< HEAD
-    def handle(self, message: str, context: dict) -> dict:
-=======
     async def handle(self, message: str, context: dict) -> dict:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         return {
             "reply": "Your message has been sent to customer service. They will respond shortly.",
             "requires_tool": False
         }
 
-<<<<<<< HEAD
-    def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
-        return {"reply": "Your message has been sent to customer service."}
-
-
-# Global orchestrator instance
-orchestrator = Orchestrator()
-
-=======
     async def handle_with_tool_result(self, message: str, context: dict, tool_result: Any) -> dict:
         return {"reply": "Your message has been sent to customer service."}
 
@@ -1433,4 +1141,3 @@ if __name__ == "__main__":
     tool_executor = ToolExecutor()
 
     orchestrator = Orchestrator(config, context_manager, intent_pipeline, tool_executor)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)

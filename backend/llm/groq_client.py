@@ -12,18 +12,6 @@ It enforces:
 from __future__ import annotations
 
 import json
-<<<<<<< HEAD
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
-
-import requests
-
-from ..config import config
-from ..intents import ALLOWED_INTENTS_SET
-from ..logger import logger
-
-
-=======
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
@@ -37,7 +25,6 @@ from ..intents import ALLOWED_INTENTS_SET
 from ..logger import logger
 
  
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 WATER_UTILITY_GUARDRAIL_SYSTEM_PROMPT = """You are a Water Utility Customer Support AI.
 
 You ONLY handle:
@@ -162,8 +149,6 @@ def _truncate_text(value: Any, limit: int = 240) -> str:
     return f"{text[: limit - 3].rstrip()}..."
 
 
-<<<<<<< HEAD
-=======
 def _sanitize_for_groq(text: Any) -> str:
     """Redact private identifiers before sending content to Groq."""
     t = context_redact_pii(str(text or ""))
@@ -183,7 +168,6 @@ def _history_turn_text(turn: dict) -> str:
     return str(turn.get("text") or turn.get("content") or "").strip()
 
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
     """Format the recent session state for classification and response generation."""
 
@@ -206,11 +190,7 @@ def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
     if populated_entities:
         lines.append(f"Known entities: {json.dumps(populated_entities, ensure_ascii=True)}")
 
-<<<<<<< HEAD
-    summary = _truncate_text(session.get("conversation_summary"), limit=160)
-=======
     summary = _truncate_text(_sanitize_for_groq(session.get("conversation_summary")), limit=160)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     if summary:
         lines.append(f"Conversation summary: {summary}")
 
@@ -220,11 +200,7 @@ def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
             continue
         role = str(turn.get("role") or "user").strip().lower()
         label = "User" if role == "user" else "Assistant"
-<<<<<<< HEAD
-        text = _truncate_text(turn.get("text"), limit=180)
-=======
         text = _truncate_text(_sanitize_for_groq(_history_turn_text(turn)), limit=180)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         if text:
             recent_turns.append(f"{label}: {text}")
 
@@ -268,11 +244,7 @@ def _post_chat_completions(*, messages: list[dict[str, str]], max_tokens: int = 
 
 
 def classify_intent(message: str, session: dict) -> Dict[str, Any]:
-<<<<<<< HEAD
-    """Classify intent using Groq only.
-=======
     """Classify intent using Groq with agentic intent discovery.
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     Args:
         message: User message
@@ -281,9 +253,6 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
     Returns:
         Normalized dict: {intent, confidence, entities}
     """
-<<<<<<< HEAD
-
-=======
     
     # First, try agentic intent discovery for unknown patterns
     try:
@@ -321,7 +290,6 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
         logger.warning(f"Agentic intent discovery failed: {e}, falling back to standard classification")
     
     # Fallback to standard Groq classification
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     system = WATER_UTILITY_GUARDRAIL_SYSTEM_PROMPT
     # IMPORTANT: this prompt contains JSON examples with braces.
     # Using .format() would treat braces as placeholders, so we do a safe replace instead.
@@ -331,18 +299,11 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
 
     session_context = _conversation_context_block(session)
     session_section = f"Session context:\n{session_context}\n\n" if session_context else ""
-<<<<<<< HEAD
-    user_content = (
-        f"{schema}\n\n"
-        f"{session_section}"
-        f"Latest user message: {message}"
-=======
     message_redacted = _sanitize_for_groq(message)
     user_content = (
         f"{schema}\n\n"
         f"{session_section}"
         f"Latest user message: {message_redacted}"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     ).strip()
 
     text = _post_chat_completions(
@@ -417,11 +378,7 @@ def _post_chat_completions_text(
         raise RuntimeError(f"Unexpected Groq response: {str(data)[:300]}")
 
 
-<<<<<<< HEAD
-WATER_UTILITY_RESPONSE_SYSTEM_PROMPT = """You are a Water Utility Customer Support AI.
-=======
 WATER_UTILITY_RESPONSE_SYSTEM_PROMPT = """You are an AI Water Utility Customer Support assistant.
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 You help with water-utility customer support only, including:
 - billing and payments
@@ -433,14 +390,6 @@ You help with water-utility customer support only, including:
 - office information
 
 Style:
-<<<<<<< HEAD
-- sound natural and helpful (not robotic)
-- keep answers concise
-- ask for the minimum information needed to help
-
-Safety / guardrails:
-- If the user asks something unrelated to water utility services, politely decline and steer them back.
-=======
 - Be concise — keep replies to 1-3 short sentences maximum
 - Sound natural and helpful, not robotic
 - Ask for only the minimum information needed
@@ -448,7 +397,6 @@ Safety / guardrails:
 
 Safety / guardrails:
 - If the user asks something unrelated to water utility services, politely decline in one sentence and steer them back.
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 - Do not invent official contacts, addresses, account balances, payment numbers, or internal system statuses.
 """
 
@@ -460,11 +408,6 @@ def generate_response(
     intent: str | None = None,
     facts: str | None = None,
     additional_instructions: str | None = None,
-<<<<<<< HEAD
-    max_tokens: int = 220,
-) -> str:
-    """Generate a natural language response using Groq (text output)."""
-=======
     max_tokens: int = 120,
 ) -> str:
     """Generate a natural language response using Groq (text output).
@@ -477,25 +420,16 @@ def generate_response(
 
     if not is_groq_reachable(timeout=3.0):
         raise RuntimeError("Groq unreachable (offline mode)")
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     intent_hint = f"Detected intent: {intent}." if intent else ""
     session_context = _conversation_context_block(session)
     session_section = f"Session context:\n{session_context}\n\n" if session_context else ""
-<<<<<<< HEAD
-    facts_block = f"\n\nFACTS (use only these facts when giving specific details):\n{facts}" if facts else ""
-    extra = f"\n\nExtra instructions:\n{additional_instructions}" if additional_instructions else ""
-
-    user_content = (
-        f"{session_section}{intent_hint}\n\nLatest user message: {message}{facts_block}{extra}\n\n"
-=======
     message_redacted = _sanitize_for_groq(message)
     facts_block = f"\n\nFACTS (use only these facts when giving specific details):\n{_sanitize_for_groq(facts)}" if facts else ""
     extra = f"\n\nExtra instructions:\n{additional_instructions}" if additional_instructions else ""
 
     user_content = (
         f"{session_section}{intent_hint}\n\nLatest user message: {message_redacted}{facts_block}{extra}\n\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         "Reply as the assistant."
     ).strip()
 
@@ -516,11 +450,7 @@ def detect_human_request(message: str, session: dict) -> Dict[str, Any]:
     user = (
         "Detect if the user explicitly asks to speak to a human agent/operator/real person/customer service. "
         "Return request_human=true only for explicit requests.\n\n"
-<<<<<<< HEAD
-        f"User message: {message}"
-=======
         f"User message: {_sanitize_for_groq(message)}"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     )
 
     text = _post_chat_completions(
@@ -553,11 +483,7 @@ def classify_billing_subintent(message: str, session: dict) -> Dict[str, Any]:
         "- payment_not_reflected: user paid but payment is missing/not updated/still unpaid\n"
         "- wrong_bill: bill is incorrect/too high/wrong reading\n"
         "- bill_check: balance/bill amount/due date\n\n"
-<<<<<<< HEAD
-        f"User message: {message}"
-=======
         f"User message: {_sanitize_for_groq(message)}"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     )
 
     text = _post_chat_completions(

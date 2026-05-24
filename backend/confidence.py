@@ -9,11 +9,7 @@ Implements a sophisticated confidence-based system that:
 5. Learns from escalations to improve future responses
 """
 
-<<<<<<< HEAD
-from typing import Dict, Tuple, Optional
-=======
 from typing import Dict, Tuple, Any, Optional
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 from enum import Enum
 
 
@@ -115,11 +111,7 @@ class ConfidenceHandler:
         """
         if tier == ConfidenceTier.LOW:
             return (
-<<<<<<< HEAD
-                f"I think you're asking about **{intent.replace('_', ' ')}**, but I'm not entirely sure.\n\n"
-=======
                 f"I think you are asking about {intent.replace('_', ' ')}, but I am not entirely sure.\n\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 f"Could you please clarify or rephrase your request?\n\n"
                 f"For example:\n"
                 f"- 'Check my water bill'\n"
@@ -131,27 +123,16 @@ class ConfidenceHandler:
         elif tier == ConfidenceTier.VERY_LOW:
             if low_confidence_count >= 2:
                 return (
-<<<<<<< HEAD
-                    f"I'm having trouble understanding your request (attempt {low_confidence_count}/3).\n\n"
-=======
                     f"I am having trouble understanding your request (attempt {low_confidence_count}/3).\n\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                     f"Please try rephrasing, or I can connect you with a human agent.\n\n"
                     f"Type 'agent' to speak with someone, or 'help' to see what I can do."
                 )
             else:
                 return (
-<<<<<<< HEAD
-                    f"I didn't quite understand that. Could you please rephrase?\n\n"
-                    f"Try being more specific, like:\n"
-                    f"- 'I need to check my bill'\n"
-                    f"- 'There's no water in my area'\n"
-=======
                     f"I did not quite understand that. Could you please rephrase?\n\n"
                     f"Try being more specific, like:\n"
                     f"- 'I need to check my bill'\n"
                     f"- 'There is no water in my area'\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                     f"- 'I want to track my complaint'\n\n"
                     f"Or type 'help' for options."
                 )
@@ -167,11 +148,7 @@ class ConfidenceHandler:
             Escalation message
         """
         return (
-<<<<<<< HEAD
-            "🤔 **I've tried my best to understand, but I'm still not sure how to help.**\n\n"
-=======
             "I have tried my best to understand, but I am still not sure how to help.\n\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             "Let me connect you with a human agent who can better assist you.\n\n"
             "This will help me learn to handle similar requests in the future."
         )
@@ -185,21 +162,6 @@ class ConfidenceHandler:
             Menu prompt
         """
         return (
-<<<<<<< HEAD
-            "I'm not sure what you need. Please choose:\n\n"
-            "**Water Issues:**\n"
-            "1️⃣ No water / Low pressure\n"
-            "2️⃣ Leak or burst pipe\n"
-            "3️⃣ Water quality problem\n\n"
-            "**Billing & Payments:**\n"
-            "4️⃣ Check my bill\n"
-            "5️⃣ Payment methods\n\n"
-            "**Other:**\n"
-            "6️⃣ Track complaint (ticket number)\n"
-            "7️⃣ New connection\n"
-            "8️⃣ Office information\n"
-            "9️⃣ Speak to agent\n\n"
-=======
             "I am not sure what you need. Please choose:\n\n"
             "Water Issues:\n"
             "1. No water / Low pressure\n"
@@ -213,16 +175,11 @@ class ConfidenceHandler:
             "7. New connection\n"
             "8. Office information\n"
             "9. Speak to agent\n\n"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             "Reply with the number of your choice."
         )
     
     @staticmethod
-<<<<<<< HEAD
-    def handle_menu_selection(selection: str) -> Dict[str, any]:
-=======
     def handle_menu_selection(selection: str) -> Dict[str, Any]:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         """
         Handle menu selection and map to intent.
         

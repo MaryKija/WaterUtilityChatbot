@@ -27,11 +27,7 @@ import random
 import string
 import time
 from dataclasses import asdict, dataclass
-<<<<<<< HEAD
-from datetime import datetime, timezone
-=======
 from datetime import datetime, timezone, timedelta
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 from typing import Any, Dict, List, Optional
 
 import sqlite3

@@ -2,13 +2,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-<<<<<<< HEAD
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-import shutil
-from typing import Any, Optional
-=======
 import uuid
 import re
 from dataclasses import dataclass
@@ -16,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import shutil
 from typing import Any, Optional, Dict, List
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 # HARD REQUIREMENT: Persist in SQLite `water_utility.db`.
@@ -37,8 +29,6 @@ INTENT_LABELS_TABLE = "intent_labels"
 INTENT_CANDIDATES_TABLE = "intent_candidates"
 INTENT_METRICS_TABLE = "intent_metrics"
 NEW_CONNECTIONS_TABLE = "new_connections"
-<<<<<<< HEAD
-=======
 CUSTOMERS_TABLE = "mock_customers"
 ACCOUNTS_TABLE = "mock_accounts"
 BILLS_TABLE = "mock_bills"
@@ -53,13 +43,10 @@ ADMIN_RESOLUTION_TABLE = "admin_resolution"
 
 # Customer PIN authentication table
 CUSTOMER_AUTH_TABLE = "customer_auth"
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 ALLOWED_COMPLAINT_STATUSES = {"OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "ESCALATED"}
 ALLOWED_ESCALATION_STATUSES = {"WAITING", "ACTIVE", "CLOSED"}
-<<<<<<< HEAD
-=======
 ALLOWED_COMPLAINT_CATEGORIES = {
     "BILLING",
     "NO_WATER",
@@ -71,7 +58,6 @@ ALLOWED_COMPLAINT_CATEGORIES = {
     "OTHER",
 }
 ALLOWED_COMPLAINT_PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def _connect() -> sqlite3.Connection:
@@ -116,12 +102,9 @@ class Complaint:
     updated_at: str
     assigned_to: Optional[str]
     notes: list[dict[str, Any]]
-<<<<<<< HEAD
-=======
     category: str
     priority: str
     sla_due_at: Optional[str]
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 @dataclass(frozen=True)
@@ -148,8 +131,6 @@ class Connection:
     created_at: str
 
 
-<<<<<<< HEAD
-=======
 @dataclass(frozen=True)
 class CustomerAccount:
     account_number: str
@@ -241,7 +222,6 @@ class Office:
     email: str
 
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def init_db() -> None:
     """Initialize / upgrade local SQLite schema."""
 
@@ -257,14 +237,10 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 assigned_to TEXT,
-<<<<<<< HEAD
-                notes_json TEXT
-=======
                 notes_json TEXT,
                 category TEXT NOT NULL DEFAULT 'OTHER',
                 priority TEXT NOT NULL DEFAULT 'NORMAL',
                 sla_due_at TEXT
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             )
             """
         )
@@ -274,27 +250,21 @@ def init_db() -> None:
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN updated_at TEXT",
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN assigned_to TEXT",
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN notes_json TEXT",
-<<<<<<< HEAD
-=======
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN category TEXT NOT NULL DEFAULT 'OTHER'",
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN priority TEXT NOT NULL DEFAULT 'NORMAL'",
             f"ALTER TABLE {COMPLAINTS_TABLE} ADD COLUMN sla_due_at TEXT",
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         ]:
             try:
                 conn.execute(ddl)
             except sqlite3.OperationalError:
                 # Duplicate column, etc.
                 pass
-<<<<<<< HEAD
-=======
         conn.execute(
             f"UPDATE {COMPLAINTS_TABLE} SET category = 'OTHER' WHERE category IS NULL OR TRIM(category) = ''"
         )
         conn.execute(
             f"UPDATE {COMPLAINTS_TABLE} SET priority = 'NORMAL' WHERE priority IS NULL OR TRIM(priority) = ''"
         )
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
         conn.execute(
             f"""
@@ -458,8 +428,6 @@ def init_db() -> None:
         conn.execute(f"CREATE INDEX IF NOT EXISTS idx_new_connections_status ON {NEW_CONNECTIONS_TABLE}(status)")
         conn.execute(f"CREATE INDEX IF NOT EXISTS idx_new_connections_ticket ON {NEW_CONNECTIONS_TABLE}(ticket_id)")
 
-<<<<<<< HEAD
-=======
         # ------------------------------
         # Mock utility integration tables
         # ------------------------------
@@ -1006,7 +974,6 @@ def next_account_number(conn: sqlite3.Connection) -> str:
         )
     return f"{next_val:06d}"
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 def log_conversation_turn(
     *,
@@ -1103,9 +1070,6 @@ def upsert_session_context(user_id: str, context: dict[str, Any]) -> None:
             )
 
 
-<<<<<<< HEAD
-def create_complaint(*, name: str, area: str, issue: str, ticket_id: str | None = None) -> str:
-=======
 def infer_complaint_category(issue: str) -> str:
     """Infer staff triage category from a customer issue description."""
 
@@ -1179,13 +1143,10 @@ def create_complaint(
     category: str | None = None,
     priority: str | None = None,
 ) -> str:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     """Create a complaint ticket and return ticket_id."""
 
     init_db()
     created_at = _now()
-<<<<<<< HEAD
-=======
     issue_category = (category or infer_complaint_category(issue)).upper().strip()
     if issue_category not in ALLOWED_COMPLAINT_CATEGORIES:
         issue_category = "OTHER"
@@ -1193,7 +1154,6 @@ def create_complaint(
     if issue_priority not in ALLOWED_COMPLAINT_PRIORITIES:
         issue_priority = "NORMAL"
     sla_due_at = calculate_sla_due_at(issue_priority, created_at)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     def _generate_ticket_id() -> str:
         import random
@@ -1209,12 +1169,6 @@ def create_complaint(
                 conn.execute(
                     f"""
                     INSERT INTO {COMPLAINTS_TABLE}(
-<<<<<<< HEAD
-                        ticket_id, name, area, issue, status, created_at, updated_at, assigned_to, notes_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (tid, name, area, issue, "OPEN", created_at, created_at, None, "[]"),
-=======
                         ticket_id, name, area, issue, status, created_at, updated_at,
                         assigned_to, notes_json, category, priority, sla_due_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1233,7 +1187,6 @@ def create_complaint(
                         issue_priority,
                         sla_due_at,
                     ),
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                 )
             return tid
         except sqlite3.IntegrityError:
@@ -1256,14 +1209,10 @@ def list_complaints() -> list[Complaint]:
                 created_at,
                 COALESCE(updated_at, created_at) as updated_at,
                 assigned_to,
-<<<<<<< HEAD
-                COALESCE(notes_json, '[]') as notes_json
-=======
                 COALESCE(notes_json, '[]') as notes_json,
                 COALESCE(category, 'OTHER') as category,
                 COALESCE(priority, 'NORMAL') as priority,
                 sla_due_at
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             FROM {COMPLAINTS_TABLE}
             ORDER BY created_at DESC
             """
@@ -1271,26 +1220,7 @@ def list_complaints() -> list[Complaint]:
 
     items: list[Complaint] = []
     for row in rows:
-<<<<<<< HEAD
-        notes = _safe_json_loads(row[8], default=[])
-        if not isinstance(notes, list):
-            notes = []
-        items.append(
-            Complaint(
-                ticket_id=row[0],
-                name=row[1],
-                area=row[2],
-                issue=row[3],
-                status=row[4],
-                created_at=row[5],
-                updated_at=row[6],
-                assigned_to=row[7],
-                notes=notes,
-            )
-        )
-=======
         items.append(_complaint_from_row(row))
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     return items
 
 
@@ -1312,14 +1242,10 @@ def get_complaint(ticket_id: str) -> Complaint | None:
                 created_at,
                 COALESCE(updated_at, created_at) as updated_at,
                 assigned_to,
-<<<<<<< HEAD
-                COALESCE(notes_json, '[]') as notes_json
-=======
                 COALESCE(notes_json, '[]') as notes_json,
                 COALESCE(category, 'OTHER') as category,
                 COALESCE(priority, 'NORMAL') as priority,
                 sla_due_at
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             FROM {COMPLAINTS_TABLE}
             WHERE ticket_id = ?
             """,
@@ -1329,25 +1255,7 @@ def get_complaint(ticket_id: str) -> Complaint | None:
     if not row:
         return None
 
-<<<<<<< HEAD
-    notes = _safe_json_loads(row[8], default=[])
-    if not isinstance(notes, list):
-        notes = []
-
-    return Complaint(
-        ticket_id=row[0],
-        name=row[1],
-        area=row[2],
-        issue=row[3],
-        status=row[4],
-        created_at=row[5],
-        updated_at=row[6],
-        assigned_to=row[7],
-        notes=notes,
-    )
-=======
     return _complaint_from_row(row)
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
 
 def set_complaint_status(ticket_id: str, status: str) -> bool:
@@ -1393,8 +1301,6 @@ def add_complaint_note(ticket_id: str, note: str, *, author: str = "agent") -> b
     return cur.rowcount > 0
 
 
-<<<<<<< HEAD
-=======
 def assign_complaint(ticket_id: str, assigned_to: str | None) -> bool:
     init_db()
 
@@ -1434,7 +1340,6 @@ def set_complaint_priority(ticket_id: str, priority: str) -> bool:
     return cur.rowcount > 0
 
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def create_escalation(
     *,
     ticket_id: str,
@@ -1744,8 +1649,6 @@ def create_connection_request(data: dict) -> str:
     return f"Connection request #{tid} created successfully for {name}."
 
 
-<<<<<<< HEAD
-=======
 def get_customer_account(account_number: str) -> CustomerAccount | None:
     """Fetch customer/account profile from the mock CRM/account registry."""
 
@@ -2477,4 +2380,3 @@ def update_customer_loyalty(customer_id: str, loyalty_score: int) -> bool:
             return False
 
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)

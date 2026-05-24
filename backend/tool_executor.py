@@ -16,13 +16,6 @@ from typing import Any, Dict, Optional
 
 from .logger import logger
 from .tools import (
-<<<<<<< HEAD
-    log_complaint,
-    get_complaint_status,
-    get_bill,
-    escalate_to_human,
-    get_payment_methods,
-=======
     check_area_outage,
     create_complaint_ticket,
     log_complaint,
@@ -33,7 +26,6 @@ from .tools import (
     escalate_to_human,
     get_payment_methods,
     get_payment_status,
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     get_office_info,
     create_connection_request,
 )
@@ -49,8 +41,6 @@ class ToolExecutor:
     def _register_tools(self):
         """Register all available tools with their schemas."""
         self.tools = {
-<<<<<<< HEAD
-=======
             "create_complaint_ticket": {
                 "function": create_complaint_ticket,
                 "input_schema": {
@@ -65,7 +55,6 @@ class ToolExecutor:
                 },
                 "output_schema": {"type": "string"},
             },
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             "log_complaint": {
                 "function": log_complaint,
                 "input_schema": {
@@ -101,8 +90,6 @@ class ToolExecutor:
                 },
                 "output_schema": {"type": "string"}
             },
-<<<<<<< HEAD
-=======
             "get_customer_account": {
                 "function": get_customer_account,
                 "input_schema": {
@@ -147,7 +134,6 @@ class ToolExecutor:
                 },
                 "output_schema": {"type": "object"}
             },
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             "escalate_to_human": {
                 "function": escalate_to_human,
                 "input_schema": {
@@ -172,13 +158,9 @@ class ToolExecutor:
                 "function": get_office_info,
                 "input_schema": {
                     "type": "object",
-<<<<<<< HEAD
-                    "properties": {},
-=======
                     "properties": {
                         "branch_or_area": {"type": "string"}
                     },
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
                     "required": []
                 },
                 "output_schema": {"type": "string"}
@@ -199,11 +181,7 @@ class ToolExecutor:
             }
         }
 
-<<<<<<< HEAD
-    def execute(self, tool_name: str, parameters: dict, context: dict) -> Any:
-=======
     async def execute(self, tool_name: str, parameters: dict, context: dict) -> Any:
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
         """Execute a tool with given parameters."""
         if tool_name not in self.tools:
             logger.error(f"Tool not found: {tool_name}")
@@ -217,8 +195,6 @@ class ToolExecutor:
 
             # Execute tool
             function = tool_info["function"]
-<<<<<<< HEAD
-=======
             reason = self._selection_reason(tool_name, parameters, context)
             context["last_tool_used"] = tool_name
             context["last_tool_reason"] = reason
@@ -226,7 +202,6 @@ class ToolExecutor:
                 {"tool": tool_name, "reason": reason, "parameters": dict(parameters)}
             )
             logger.info(f"Tool selected: {tool_name} reason={reason}")
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             result = self._call_tool(function, parameters)
 
             # Update context if needed
@@ -258,12 +233,6 @@ class ToolExecutor:
         ]
 
         if len(positional_params) == 1 and not keyword_only_params:
-<<<<<<< HEAD
-            return function(parameters)
-
-        return function(**parameters)
-
-=======
             p0 = positional_params[0]
             # Pass the request payload as a single dict only for true payload-style tools.
             # (With postponed annotations, `p0.annotation is dict` is unreliable.)
@@ -292,7 +261,6 @@ class ToolExecutor:
             return f"intent={intent}; payment verification requested; payment reconciliation lookup required"
         return f"intent={intent}; selected by agent workflow"
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     def _validate_parameters(self, parameters: dict, schema: dict):
         """Validate parameters against schema."""
         required = schema.get("required", [])
@@ -322,16 +290,6 @@ class ToolExecutor:
                 entities = context.get("entities", {})
                 entities["ticket_id"] = ticket_match.group(0)
                 context["entities"] = entities
-<<<<<<< HEAD
-
-        elif tool_name == "get_bill":
-            # Mark billing inquiry as complete
-            pass
-
-        elif tool_name == "create_connection_request":
-            # Mark connection request as complete
-            pass
-=======
             # Flow is complete — clear agent lock so next message is classified fresh
             context["active_agent"] = None
             context["flow_started"] = False
@@ -350,7 +308,6 @@ class ToolExecutor:
             context["active_agent"] = None
             context["flow_started"] = False
             context["step"] = None
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 
     def get_available_tools(self) -> list[str]:
         """Get list of available tool names."""

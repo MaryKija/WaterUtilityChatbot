@@ -4,18 +4,11 @@ Universal entity extraction: regex-first → validate → LLM fallback.
 
 Integrates with workflows to skip redundant questions."""
 
-<<<<<<< HEAD
-import re
-from typing import Dict, Optional
-
-from .validation import is_valid_name, is_valid_phone, is_valid_email, normalize_phone, extract_account_number, extract_ticket_id
-=======
 import json
 import re
 from typing import Dict, Optional
 from .tools import is_valid_name, is_valid_phone, is_valid_email, normalize_phone
 from .validation import extract_account_number, extract_ticket_id
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 from .validators import is_valid_account
 from .llm.groq_client import generate_response
 from .config import config
@@ -97,26 +90,14 @@ def _llm_fallback(text: str, missing_entities: list[str]) -> Dict[str, str]:
     )
     
     try:
-<<<<<<< HEAD
-        result = generate_response(
-=======
         # 1. Get the raw string response from Groq
         response_text = generate_response(
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
             text,
             {},
             intent="entity_extraction",
             additional_instructions=system,
             max_tokens=100,
         )
-<<<<<<< HEAD
-        # Parse simple JSON response.
-        parsed = {}
-        for k in missing_entities:
-            if k in result:
-                parsed[k] = result[k]
-        return parsed
-=======
 
         # 2. Extract and parse the JSON block
         res_dict = {}
@@ -136,15 +117,11 @@ def _llm_fallback(text: str, missing_entities: list[str]) -> Dict[str, str]:
                     parsed[k] = str(res_dict[k])
         return parsed
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
     except Exception as e:
         logger.warning(f"llm_fallback_failed err={e}")
         return {}
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 9a7f394 (Initial clean commit for capstone project)
 def extract_and_validate(text: str, required: list[str]) -> Dict[str, str]:
     """Full pipeline: extract → validate → LLM fallback → normalize."""
     entities = extract_entities(text)
