@@ -1003,7 +1003,7 @@ def log_conversation_turn(
     to = (text_original or "").strip()
     fl = (flow or "").strip() or None
     it = (intent or "").strip() or None
-    conf = float(confidence) if confidence is not None else None
+    conf = confidence if confidence is not None else None
 
     if not tr:
         tr = "[EMPTY]"
@@ -1949,7 +1949,7 @@ def get_user_feedback(session_id: str) -> UserFeedback | None:
 def list_user_feedback(*, limit: int = 20) -> list[UserFeedback]:
     """Return recent user feedback for staff review."""
     init_db()
-    lim = max(1, min(int(limit or 20), 100))
+    lim = max(1, min(limit or 20, 100))
     with _connect() as conn:
         rows = conn.execute(
             f"""

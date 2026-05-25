@@ -44,13 +44,13 @@ def _fmt_datetime(iso_str: str | None) -> str:
     if not iso_str:
         return "—"
     try:
-        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
         # Day without leading zero — Windows uses %#d, Linux/Mac uses %-d
         import platform
         day_fmt = "%#d" if platform.system() == "Windows" else "%-d"
         return dt.strftime(f"{day_fmt} %b %Y, %I:%M %p").lstrip("0")
     except Exception:
-        return str(iso_str)
+        return iso_str
 
 
 def _fmt_date(iso_str: str | None) -> str:
@@ -64,13 +64,13 @@ def _fmt_date(iso_str: str | None) -> str:
     if not iso_str:
         return "—"
     try:
-        raw = str(iso_str).split("T")[0]
+        raw = iso_str.split("T")[0]
         dt = datetime.strptime(raw, "%Y-%m-%d")
         import platform
         day_fmt = "%#d" if platform.system() == "Windows" else "%-d"
         return dt.strftime(f"{day_fmt} %b %Y")
     except Exception:
-        return str(iso_str)
+        return iso_str
 
 
 def is_valid_name(name: str) -> bool:
@@ -92,25 +92,25 @@ def normalize_phone(phone: str) -> str:
 def get_customer_account(account_number: str):
     """Read customer/account details from the mock CRM/account registry."""
 
-    return storage_get_customer_account(str(account_number or "").strip())
+    return storage_get_customer_account((account_number or "").strip())
 
 
 def get_latest_bill(account_number: str):
     """Read the latest bill from the mock billing system."""
 
-    return storage_get_latest_bill(str(account_number or "").strip())
+    return storage_get_latest_bill((account_number or "").strip())
 
 
 def get_payment_status(account_number: str):
     """Read payment reconciliation status from the mock payment system."""
 
-    return storage_get_payment_status(str(account_number or "").strip())
+    return storage_get_payment_status((account_number or "").strip())
 
 
 def check_area_outage(area: str):
     """Read outage status from the mock operations/outage system."""
 
-    return storage_check_area_outage(str(area or "").strip())
+    return storage_check_area_outage((area or "").strip())
 
 
 def create_complaint_ticket(*, name: str, area: str, issue: str, ticket_id: str | None = None) -> str:
@@ -177,7 +177,7 @@ def get_complaint_status(ticket_id: str):
 
     if isinstance(ticket_id, dict):
         ticket_id = str(ticket_id.get("ticket_id") or ticket_id.get("ticket") or "").strip()
-    ticket_id = str(ticket_id or "").strip()
+    ticket_id = (ticket_id or "").strip()
 
     complaint = get_complaint(ticket_id)
 
@@ -195,7 +195,7 @@ def get_complaint_status(ticket_id: str):
     return (
         f"Complaint Status\n\n"
         f"Reference: {complaint.ticket_id}\n"
-        f"Status: {str(complaint.status).upper()}\n"
+        f"Status: {complaint.status.upper()}\n"
         f"Logged: {_fmt_datetime(complaint.created_at)}"
         f"{updated_line}\n\n"
         f"Issue: {complaint.issue}\n"
@@ -216,7 +216,7 @@ def get_bill(account_number: str):
         get_schedule_for_category,
     )
 
-    account_number = str(account_number or "").strip()
+    account_number = (account_number or "").strip()
     account = get_customer_account(account_number)
     if not account:
         logger.info(f"Billing lookup account_not_found account={account_number}")
@@ -241,7 +241,7 @@ def get_bill(account_number: str):
             f"({payment.status}, Ref: {payment.reference})"
         )
 
-    if bill.status.upper() == "PAID" or float(bill.amount_due) <= 0:
+    if bill.status.upper() == "PAID" or bill.amount_due <= 0:
         return (
             "Billing Information — LgWSC\n\n"
             f"Account: {account_number}\n"

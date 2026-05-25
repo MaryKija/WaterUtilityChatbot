@@ -46,7 +46,7 @@ class SessionScore:
     efficiency_score: float  # 0-1 (lower turns = better)
     escalation_necessity: float  # 0-1 (was escalation necessary)
     final_score: float  # 0-1 weighted combination
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: Dict[str, Any] | None = field(default_factory=dict)
 
     def __post_init__(self):
         if self.details is None:
@@ -226,7 +226,7 @@ class EvaluationEngine:
         if intent:
             relevant_sessions = [
                 score for score in self.session_scores.values()
-                if score.details.get("intent") == intent
+                if (score.details or {}).get("intent") == intent
             ]
         else:
             relevant_sessions = list(self.session_scores.values())

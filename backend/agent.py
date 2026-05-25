@@ -239,11 +239,14 @@ def _fill_complaint_fields_from_message(message: str, session: dict) -> dict:
     return session
 
 
-def _minutes_remaining(locked_until_str: str) -> int:
+def _minutes_remaining(locked_until_str: str | None) -> int:
     """Return whole minutes remaining until *locked_until_str* (ISO 8601 UTC).
 
     Returns at least 1 so the message never says "0 minute(s)".
     """
+    if not locked_until_str:
+        return 1
+
     from datetime import datetime, timezone
 
     try:
@@ -265,12 +268,14 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
     confidence = float(intent_data.get("confidence", 0.0))
     auto_escalated = bool(intent_data.get("auto_escalated", False))
     original_intent = str(intent_data.get("original_intent") or routed_intent)
-    entities = context.get("entities", intent_data.get("entities", {}))
+    raw_entities = context.get("entities") or intent_data.get("entities")
+    entities = raw_entities if isinstance(raw_entities, dict) else {}
     
     from .validators import extract_account_number  # Always available
 
     # REUSE EXISTING account_number FIRST
-    acct = context.get("entities", {}).get("account_number") or extract_account_number(message)
+    acct = entities.get("account_number") or extract_account_number(message)
+
     if acct:
         logger.info(f"Account found from context/msg: {acct}")
 
@@ -605,7 +610,8 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
         # --- PIN gate (Requirements 3.2, 3.3, 3.4, 3.6, 3.7, 4.4, 5.2, 5.3, 5.4, 5.5, 5.8, 8.4) ---
 
         # Persist the validated account number into entities so it survives across turns.
-        entities = context.get("entities", {})
+        raw_entities_pin = context.get("entities")
+        entities = raw_entities_pin if isinstance(raw_entities_pin, dict) else {}
         entities["account_number"] = acct
         context["entities"] = entities
 
@@ -777,7 +783,7 @@ def run_agent(message: str, intent_data: dict, context: dict) -> str:
 
         _ensure_escalation_record(
             session=session,
-            ticket_id=str(ticket_id),
+            ticket_id=ticket_id,
             reason=reason,
             initial_messages=[
                 {"sender": "user", "text": message},

@@ -623,6 +623,7 @@ def clear_workflow_for_ticket(ticket_id: str) -> int:
 
     from .storage import DB_PATH
 
+    conn = None
     affected = 0
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -670,10 +671,11 @@ def clear_workflow_for_ticket(ticket_id: str) -> int:
     except Exception as e:
         logger.error(f"context_engine.clear_workflow_for_ticket_failed ticket_id={tid} err={e}")
     finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     logger.info(
         "context_engine.clear_workflow_for_ticket",
