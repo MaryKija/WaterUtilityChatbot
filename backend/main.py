@@ -90,7 +90,7 @@ app.add_middleware(
 # Mount static files for production
 frontend_path = Path(__file__).parent.parent / "frontend" / "aqua-chat-modern-main" / "dist"
 if frontend_path.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_path)), name="assets")
+    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
 
 # Explicit root route - serve index.html directly
 @app.get("/")

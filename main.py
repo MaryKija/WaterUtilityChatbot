@@ -119,6 +119,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 frontend_path = PROJECT_ROOT / "frontend" / "aqua-chat-modern-main" / "dist"
 if frontend_path.exists():
+    # Mount Vite assets so resource requests like /assets/... are served with correct MIME types
+    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
     app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 # Session memory (per phone number)
