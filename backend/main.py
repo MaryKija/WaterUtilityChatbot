@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import json
 import os
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import asdict
@@ -28,6 +29,7 @@ from .storage import (
 )
 
 from .context_engine import context_redact_pii, context_manager
+from .health import groq_health_check, _safe_classify
 
 
 def _require_admin(authorization: str | None) -> None:
@@ -89,8 +91,15 @@ app.add_middleware(
 
 # Mount static files for production
 frontend_path = Path(__file__).parent.parent / "frontend" / "aqua-chat-modern-main" / "dist"
-if frontend_path.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
+
+# Ensure static directories exist so they can be unconditionally mounted safely
+# without raising Starlette's Directory nonexistent RuntimeError on startup.
+assets_path = frontend_path / "assets"
+assets_path.mkdir(parents=True, exist_ok=True)
+
+# Mount Vite assets so resource requests like /assets/... are served with correct MIME types
+app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 # Explicit root route - serve index.html directly
 @app.get("/")
@@ -107,8 +116,14 @@ async def serve_frontend(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     
-    # Skip asset requests - let static mount handle them
-    if full_path.startswith("assets/"):
+    # Skip asset requests - let static mount handle them or return 404
+    # (Checking prefixes and standard file extensions to prevent browser module MIME type errors)
+    is_asset = (
+        full_path.startswith("assets/") or 
+        full_path.startswith("static/") or 
+        any(full_path.endswith(ext) for ext in [".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".json", ".txt", ".woff", ".woff2", ".ttf", ".map"])
+    )
+    if is_asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     
     # Admin SPA
@@ -168,11 +183,20 @@ def chat(data: ChatRequest):
     phone = data.phone or data.user_id or "demo-user"
     message = data.message
 
+    # Reset context if session has been cleared (e.g. by test runner)
+    if phone not in sessions:
+        from .context_engine import context_manager
+        context = context_manager.reset_context({"user_id": phone})
+        context_manager.save_context(phone, context)
+        sessions[phone] = True
+
     # Use the new orchestrator
     from .orchestrator import orchestrator
     from .context_engine import context_redact_pii
 
-    result = orchestrator.handle_request(phone, message)
+    # Call orchestrator process using asyncio.run
+    result = asyncio.run(orchestrator.process(message=message, user_id=phone))
+    reply_text = result.get("response") or result.get("reply") or ""
 
     # Log conversation turn
     try:
@@ -188,8 +212,8 @@ def chat(data: ChatRequest):
         storage_log_conversation_turn(
             user_id=phone,
             role="bot",
-            text_redacted=context_redact_pii(result["reply"]),
-            text_original=result["reply"],
+            text_redacted=context_redact_pii(reply_text),
+            text_original=reply_text,
             flow=None,  # Will be updated by context manager
             intent=str(result.get("intent") or ""),
             confidence=float(result.get("confidence") or 0.0),
@@ -198,7 +222,7 @@ def chat(data: ChatRequest):
         logger.warning(f"conversation_history.log_failed err={e}")
 
     return {
-        "reply": result["reply"],
+        "reply": reply_text,
         "intent": result.get("intent"),
         "confidence": result.get("confidence", 0.0),
         "entities": result.get("entities", {}),
@@ -464,11 +488,11 @@ def admin_label_intent_suggestion(
         conn.execute(
             f"""INSERT INTO {INTENT_LABELS_TABLE}(suggestion_id, label, approved_by, notes, created_at)
             VALUES (?, ?, ?, ?, ?)""",
-            (sid, label, approved_by, notes, datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()),
+            (sid, label, approved_by, notes, datetime.now(timezone.utc).isoformat()),
         )
         conn.execute(
             f"UPDATE {INTENT_SUGGESTIONS_TABLE} SET status = 'APPROVED', updated_at = ? WHERE suggestion_id = ?",
-            (datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(), sid),
+            (datetime.now(timezone.utc).isoformat(), sid),
         )
         conn.commit()
 
@@ -496,7 +520,7 @@ def admin_deploy_intent_suggestion(
 
     sid = (suggestion_id or "").strip().upper()
     handler = (body.handler if body else None) or None
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     with sqlite3.connect(DB_PATH) as conn:
         sug = conn.execute(
@@ -548,7 +572,7 @@ def admin_reject_intent_suggestion(
     import sqlite3
 
     sid = (suggestion_id or "").strip().upper()
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
@@ -581,7 +605,7 @@ def admin_rollback_intent_suggestion(
 
     sid = (suggestion_id or "").strip().upper()
     candidate_id = f"CAND-{sid}"
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             f"DELETE FROM {INTENT_CANDIDATES_TABLE} WHERE candidate_id = ?",
@@ -652,7 +676,7 @@ def admin_activate_intent_candidate(
     import sqlite3
 
     cid = (candidate_id or "").strip().upper()
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     approver = (body.approved_by or "admin").strip()
     role = (body.role or "").strip().lower()
 
@@ -699,7 +723,7 @@ def admin_deactivate_intent_candidate(
     import sqlite3
 
     cid = (candidate_id or "").strip().upper()
-    now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
             f"UPDATE {INTENT_CANDIDATES_TABLE} SET active = 0, updated_at = ? WHERE candidate_id = ?",

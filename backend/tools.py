@@ -327,6 +327,8 @@ def get_payment_methods():
 
 def get_office_info(branch_or_area: str | None = None):
     """Get LgWSC branch details from the office directory."""
+    if not branch_or_area or str(branch_or_area).strip() == "" or str(branch_or_area).lower() == "none":
+        branch_or_area = "Kabwe"
 
     office = storage_get_office(branch_or_area)
     if not office:
@@ -343,8 +345,8 @@ def get_office_info(branch_or_area: str | None = None):
     hours_formatted = "\n  ".join(hours_lines)
 
     return (
-        f"LgWSC — {office.branch_name}\n\n"
-        f"Address: {office.address}\n"
+        f"LgWSC — {office.branch_name} Office\n\n"
+        f"Address/Location: {office.address}\n"
         f"Phone:   {office.phone}\n"
         f"Email:   {office.email}\n\n"
         f"Operating Hours:\n"

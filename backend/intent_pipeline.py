@@ -167,6 +167,16 @@ class IntentPipeline:
         """Run advanced hybrid intent classification pipeline with ensemble voting."""
         message_lower = message.lower().strip()
 
+        # Hard priority: general greetings and help requests
+        greetings_and_help = {"help", "hello", "hi", "hey", "good morning", "good afternoon", "thanks", "thank you"}
+        if message_lower in greetings_and_help or re.match(r'^(hi|hello|hey|help|good\s+morning|good\s+afternoon|thanks?|thank\s+you)$', message_lower):
+            return {
+                "intent": "general_chat",
+                "confidence": 0.98,
+                "entities": {},
+                "source": "rule_general_priority",
+            }
+
         # Hard priority: outage information requests must not route to complaint intake
         # e.g. "I want an update about a water outage" → report_fault (outage lookup)
         if self._outage_info_priority(message_lower):
@@ -276,7 +286,7 @@ class IntentPipeline:
             entities["fault_type"] = "leak" if "leak" in message_lower else "burst_pipe"
         elif "no water" in message_lower or "outage" in message_lower:
             entities["fault_type"] = "outage"
-        elif any(term in message_lower for term in ["dirty", "contaminated", "water quality", "smelly", "bad taste", "unsafe"]):
+        elif any(term in message_lower for term in ["dirty", "contaminated", "water quality", "smelly", "smell", "bad taste", "taste", "unsafe", "brown", "yellow", "stink"]):
             entities["fault_type"] = "water_quality"
         elif "pressure" in message_lower:
             entities["fault_type"] = "low_pressure"

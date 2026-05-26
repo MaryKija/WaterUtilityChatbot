@@ -129,12 +129,12 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow1.add_step(
         "No water coming out",
-        "no_water_supply",
+        "report_fault",
         should_contain=["help", "report", "issue"]
     )
     flow1.add_step(
         "name: John, area: Makululu, issue: No water",
-        "report_water_fault",
+        "report_fault",
         should_contain=["logged", "reference", "WC-"]
     )
     flows.append(flow1)
@@ -150,7 +150,12 @@ def create_test_flows() -> List[ConversationFlow]:
         should_contain=["account", "number"]
     )
     flow2.add_step(
-        "123456",
+        "000001",
+        "billing_inquiry",
+        should_contain=["pin", "digit"]
+    )
+    flow2.add_step(
+        "1234",
         "billing_inquiry",
         should_contain=["amount", "due", "K"]
     )
@@ -164,12 +169,12 @@ def create_test_flows() -> List[ConversationFlow]:
     flow3.add_step(
         "Check my complaint status",
         "complaint_followup",
-        should_contain=["reference", "ticket"]
+        should_contain=["reference", "WC-"]
     )
     flow3.add_step(
         "WC-A1B2C3",
         "complaint_followup",
-        should_contain=["status", "reference"]
+        should_contain=["reference", "not", "found"]
     )
     flows.append(flow3)
     
@@ -180,7 +185,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow4.add_step(
         "Help",
-        "general_faq",
+        "general_chat",
         should_contain=["help", "can", "do"]
     )
     flows.append(flow4)
@@ -192,8 +197,8 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow5.add_step(
         "I want a new water connection",
-        "new_connection_request",
-        should_contain=["connection", "apply", "office"]
+        "new_connection",
+        should_contain=["connection", "apply", "name"]
     )
     flows.append(flow5)
     
@@ -204,7 +209,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow6.add_step(
         "How can I pay?",
-        "payment_methods_info",
+        "payment_info",
         should_contain=["payment", "method", "mobile", "bank"]
     )
     flows.append(flow6)
@@ -216,7 +221,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow7.add_step(
         "Where is your office?",
-        "office_location_hours",
+        "office_info",
         should_contain=["office", "location", "hours"]
     )
     flows.append(flow7)
@@ -228,7 +233,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow8.add_step(
         "My water is brown and smells bad",
-        "water_quality_issue",
+        "report_fault",
         should_contain=["quality", "issue", "report"]
     )
     flows.append(flow8)
@@ -240,7 +245,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow9.add_step(
         "I need to speak to someone",
-        "human_escalation",
+        "escalation",
         should_contain=["agent", "representative", "escalat"]
     )
     flows.append(flow9)
@@ -252,7 +257,7 @@ def create_test_flows() -> List[ConversationFlow]:
     )
     flow10.add_step(
         "Hello",
-        "general_faq",
+        "general_chat",
         should_contain=["welcome", "help"]
     )
     flows.append(flow10)

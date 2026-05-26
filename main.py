@@ -116,12 +116,16 @@ app.add_middleware(
 
 # Mount static files for production
 PROJECT_ROOT = Path(__file__).resolve().parent
-
 frontend_path = PROJECT_ROOT / "frontend" / "aqua-chat-modern-main" / "dist"
-if frontend_path.exists():
-    # Mount Vite assets so resource requests like /assets/... are served with correct MIME types
-    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="assets")
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+
+# Ensure static directories exist so they can be unconditionally mounted safely
+# without raising Starlette's Directory nonexistent RuntimeError on startup.
+assets_path = frontend_path / "assets"
+assets_path.mkdir(parents=True, exist_ok=True)
+
+# Mount Vite assets so resource requests like /assets/... are served with correct MIME types
+app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
 
 # Session memory (per phone number)
 sessions = {}  # Keep for backward compatibility, but not used in new implementation
@@ -1427,6 +1431,16 @@ async def serve_frontend(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
     
+    # Skip asset requests - let static mount handle them or return 404
+    # (Checking prefixes and standard file extensions to prevent browser module MIME type errors)
+    is_asset = (
+        full_path.startswith("assets/") or 
+        full_path.startswith("static/") or 
+        any(full_path.endswith(ext) for ext in [".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".json", ".txt", ".woff", ".woff2", ".ttf", ".map"])
+    )
+    if is_asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
     # Admin SPA
     # Check if it's an admin route
     if full_path == "admin" or full_path == "admin/":
