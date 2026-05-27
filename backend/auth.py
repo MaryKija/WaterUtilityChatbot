@@ -235,7 +235,48 @@ class AuthService:
             "user_id": user_data["user_id"],
         })
 
-        return AdminUser(**user_data)
+        role = user_data["role"]
+        permissions = user_data["permissions"]
+        if not isinstance(role, UserRole):
+            raise TypeError("role must be a UserRole")
+        if not isinstance(permissions, list):
+            raise TypeError("permissions must be a list")
+
+        user_id_val = user_data["user_id"]
+        username_val = user_data["username"]
+        email_val = user_data["email"]
+        created_at_val = user_data["created_at"]
+
+        if not isinstance(user_id_val, str):
+            raise TypeError("user_id must be a string")
+        if not isinstance(username_val, str):
+            raise TypeError("username must be a string")
+        if not isinstance(email_val, str):
+            raise TypeError("email must be a string")
+        if not isinstance(created_at_val, str):
+            raise TypeError("created_at must be a string")
+
+        last_login_val = user_data.get("last_login")
+        last_login = last_login_val if isinstance(last_login_val, str) else None
+
+        failed_attempts_val = user_data.get("failed_login_attempts", 0)
+        failed_login_attempts = int(failed_attempts_val) if isinstance(failed_attempts_val, (int, str)) else 0
+
+        locked_until_val = user_data.get("locked_until")
+        locked_until = locked_until_val if isinstance(locked_until_val, str) else None
+
+        return AdminUser(
+            user_id=user_id_val,
+            username=username_val,
+            email=email_val,
+            role=role,
+            permissions=permissions,
+            created_at=created_at_val,
+            last_login=last_login,
+            active=bool(user_data.get("active", True)),
+            failed_login_attempts=failed_login_attempts,
+            locked_until=locked_until,
+        )
     
     def generate_token(self, user: AdminUser, expires_hours: int = 24) -> AuthToken:
         """Generate a secure stateless/stateful hybrid JWT and persist its JTI to the database."""
@@ -419,7 +460,48 @@ class AuthService:
             })
             return None
 
-        return AdminUser(**user_data)
+        role = user_data["role"]
+        permissions = user_data["permissions"]
+        if not isinstance(role, UserRole):
+            raise TypeError("role must be a UserRole")
+        if not isinstance(permissions, list):
+            raise TypeError("permissions must be a list")
+
+        user_id_val = user_data["user_id"]
+        username_val = user_data["username"]
+        email_val = user_data["email"]
+        created_at_val = user_data["created_at"]
+
+        if not isinstance(user_id_val, str):
+            raise TypeError("user_id must be a string")
+        if not isinstance(username_val, str):
+            raise TypeError("username must be a string")
+        if not isinstance(email_val, str):
+            raise TypeError("email must be a string")
+        if not isinstance(created_at_val, str):
+            raise TypeError("created_at must be a string")
+
+        last_login_val = user_data.get("last_login")
+        last_login = last_login_val if isinstance(last_login_val, str) else None
+
+        failed_attempts_val = user_data.get("failed_login_attempts", 0)
+        failed_login_attempts = int(failed_attempts_val) if isinstance(failed_attempts_val, (int, str)) else 0
+
+        locked_until_val = user_data.get("locked_until")
+        locked_until = locked_until_val if isinstance(locked_until_val, str) else None
+
+        return AdminUser(
+            user_id=user_id_val,
+            username=username_val,
+            email=email_val,
+            role=role,
+            permissions=permissions,
+            created_at=created_at_val,
+            last_login=last_login,
+            active=bool(user_data.get("active", True)),
+            failed_login_attempts=failed_login_attempts,
+            locked_until=locked_until,
+        )
 
     def revoke_token(self, token: str) -> bool:
         """Revoke the JWT statefully by flagging its JTI as inactive in the database."""

@@ -186,7 +186,7 @@ def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
         lines.append(f"Current intent: {intent}")
 
     entities = _normalize_entities(session.get("entities", {}))
-    populated_entities = {k: v for k, v in entities.items() if str(v).strip()}
+    populated_entities = {k: v for k, v in entities.items() if v.strip()}
     if populated_entities:
         lines.append(f"Known entities: {json.dumps(populated_entities, ensure_ascii=True)}")
 
@@ -411,7 +411,7 @@ def classify_intent(message: str, session: dict) -> Dict[str, Any]:
                         logger.info(f"Agentic intent discovery: matched new intent '{cluster.suggested_name}' with confidence {cluster.confidence}")
                         return {
                             "intent": cluster.suggested_name,
-                            "confidence": float(cluster.confidence),
+                            "confidence": cluster.confidence,
                             "entities": {},
                             "discovery_method": "agentic_clustering"
                         }
