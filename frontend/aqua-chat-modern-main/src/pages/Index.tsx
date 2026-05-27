@@ -82,11 +82,16 @@ const Index = () => {
   const [confidence, setConfidence] = useState("");
   const [isEscalated, setIsEscalated] = useState(false);
   const [updatesAfter, setUpdatesAfter] = useState(0);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isInitialChat = messages.length <= 1 && !isTyping;
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -253,6 +258,7 @@ const Index = () => {
 
         {/* Messages area */}
         <div 
+          ref={messagesContainerRef}
           className="chat-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto bg-chat-bg p-6"
           role="log"
           aria-live="polite"
@@ -263,7 +269,6 @@ const Index = () => {
             <MessageBubble key={msg.id} message={msg} index={i} />
           ))}
           {isTyping && <TypingIndicator />}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Persistent Quick Actions Grid */}
