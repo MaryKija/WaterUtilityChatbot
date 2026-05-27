@@ -6,16 +6,13 @@
     "module": "ESNext",
     "skipLibCheck": true,
 
-    "moduleResolution": "node",
-    "ignoreDeprecations": "5.0",
-    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
 
     "strict": true,
-    "noImplicitAny": false,
     "types": ["vite/client"]
   },
   "include": ["src"]
