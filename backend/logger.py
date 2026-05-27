@@ -99,10 +99,17 @@ def setup_logging(level: str = "INFO") -> logging.Logger:
     error_handler.setFormatter(structured_formatter)
     error_handler.addFilter(SensitiveDataFilter())
     
-    # Console handler for development
+    # Console handler (outputs structured JSON in production for Cloud Log collectors, simple logs in dev)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
+    
+    import os
+    json_logging = os.getenv("JSON_LOGGING", "false").lower() == "true" or os.getenv("DEBUG", "true").lower() == "false"
+    if json_logging:
+        console_handler.setFormatter(structured_formatter)
+    else:
+        console_handler.setFormatter(simple_formatter)
+        
     console_handler.addFilter(SensitiveDataFilter())
     
     # Add handlers to logger

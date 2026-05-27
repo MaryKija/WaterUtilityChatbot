@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -33,16 +33,29 @@ from .health import groq_health_check, _safe_classify
 
 
 def _require_admin(authorization: str | None) -> None:
-    """Simple admin token auth (API-only hooks; UI already exists)."""
+    """Verify the request carries a valid admin credential.
 
-    admin_token = os.getenv("ADMIN_TOKEN")
-    if not admin_token:
-        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not configured")
+    Accepts two token types so both auth flows work:
+    1. Static ADMIN_TOKEN from .env  — used by scripts / curl / legacy tools
+    2. Session token from /auth/login — used by the React admin dashboard
+    """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing admin bearer token")
+
     provided = authorization.split(" ", 1)[1].strip()
-    if provided != admin_token:
-        raise HTTPException(status_code=403, detail="Invalid admin token")
+
+    # --- Path 1: static ADMIN_TOKEN ---
+    admin_token = os.getenv("ADMIN_TOKEN")
+    if admin_token and provided == admin_token:
+        return  # valid
+
+    # --- Path 2: session token issued by /auth/login ---
+    from .auth import auth_service
+    user = auth_service.verify_token(provided)
+    if user is not None:
+        return  # valid session token
+
+    raise HTTPException(status_code=403, detail="Invalid or expired admin token")
 
 
 class IntentLabelRequest(BaseModel):
@@ -132,6 +145,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def cookie_to_authorization_middleware(request: Request, call_next):
+    """Intercepts requests to automatically inject the secure HttpOnly cookie as a Bearer token."""
+    if "authorization" not in request.headers:
+        cookie_token = request.cookies.get("admin_session")
+        if cookie_token:
+            scope_headers = [h for h in request.scope.get("headers", []) if h[0].lower() != b"authorization"]
+            scope_headers.append((b"authorization", f"Bearer {cookie_token}".encode("utf-8")))
+            request.scope["headers"] = scope_headers
+    return await call_next(request)
+
+
 # Mount static files for production
 frontend_path = Path(__file__).parent.parent / "frontend" / "aqua-chat-modern-main" / "dist"
 
@@ -216,6 +241,86 @@ class ComplaintNoteCreate(BaseModel):
 class EscalationReplyCreate(BaseModel):
     message: str
 
+
+
+# ---------------------------
+# Authentication Endpoints
+# ---------------------------
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    success: bool
+    token: Optional[str] = None
+    user_id: Optional[str] = None
+    role: Optional[str] = None
+    expires_at: Optional[str] = None
+    message: Optional[str] = None
+
+
+@app.post("/auth/login", response_model=LoginResponse)
+def admin_login(request: Request, login_data: LoginRequest, response: Response):
+    """Authenticate admin user, issue JWT, and set secure HttpOnly cookie."""
+    try:
+        from .auth import auth_service
+        user = auth_service.authenticate_user(login_data.username, login_data.password)
+        token = auth_service.generate_token(user)
+        
+        # Dynamically evaluate if we should set 'Secure' flag (HTTPS only in production)
+        is_secure = request.url.scheme == "https"
+        response.set_cookie(
+            key="admin_session",
+            value=token.token_hash,  # Set the full JWT token hash in the cookie
+            httponly=True,
+            secure=is_secure,
+            samesite="strict",
+            max_age=24 * 3600,  # 24 hours
+        )
+        
+        return LoginResponse(
+            success=True,
+            token=token.token_hash,  # Still returned for backward compatibility
+            user_id=user.user_id,
+            role=user.role.value,
+            expires_at=token.expires_at,
+            message="Authentication successful"
+        )
+    except Exception as e:
+        logger.warning(
+            "auth.login_failed",
+            extra={"extra_data": {"username": login_data.username, "error": str(e)}}
+        )
+        return LoginResponse(
+            success=False,
+            message="Invalid credentials"
+        )
+
+
+@app.post("/auth/logout")
+def admin_logout(response: Response, authorization: str | None = Header(default=None)):
+    """Logout, revoke JWT, and delete secure HttpOnly cookie."""
+    # We always delete the cookie regardless of authorization header presence
+    response.delete_cookie(
+        key="admin_session",
+        httponly=True,
+        samesite="strict"
+    )
+    
+    if not authorization:
+        # If no authorization provided but cookie was deleted, just return success
+        return {"success": True, "message": "Logged out successfully"}
+    
+    from .auth import auth_service
+    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+    success = auth_service.revoke_token(token)
+    
+    if success:
+        logger.info("auth.logout_success", extra={"extra_data": {"token": token[:20] + "..."}})
+        return {"success": True, "message": "Logged out successfully"}
+    else:
+        return {"success": False, "message": "Invalid token"}
 
 
 # ---------------------------

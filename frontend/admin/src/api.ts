@@ -12,6 +12,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers,
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -105,6 +106,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ username, password }),
       }
+    ),
+  logout: () =>
+    http<{ success: boolean; message?: string }>(
+      "/auth/logout",
+      { method: "POST" }
     ),
   getDashboardMetrics: () => http<any>("/admin/dashboard"),
 };

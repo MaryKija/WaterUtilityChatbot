@@ -211,36 +211,165 @@ def _conversation_context_block(session: dict, *, max_history: int = 6) -> str:
     return "\n".join(lines).strip()
 
 
+def _post_chat_completions_with_retry(
+    *, 
+    messages: list[dict[str, str]], 
+    max_tokens: int = 250, 
+    response_format_json: bool = False,
+    temperature: float = 0.0
+) -> str:
+    """Post chat completions to Groq with automatic retries, exponential backoff, and secondary provider failover (OpenAI & Anthropic)."""
+    import time
+    import random
+    import os
+    
+    max_retries = 3
+    initial_backoff = 0.5  # seconds
+    
+    last_exception = None
+    
+    # Try Groq primary provider first
+    if config.groq_api_key and config.groq_api_key != "dummy":
+        for attempt in range(max_retries + 1):
+            try:
+                payload: Dict[str, Any] = {
+                    "model": config.groq_model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                if response_format_json:
+                    payload["response_format"] = {"type": "json_object"}
+                    
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {config.groq_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=15,  # Avoid hanging request indefinitely
+                )
+                
+                # Check for rate limiting (429) or transient server errors (5xx)
+                if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+                    
+                if resp.status_code != 200:
+                    # Permanent client/auth error - fail instantly to trigger failover
+                    raise RuntimeError(f"PERMANENT_ERROR: HTTP {resp.status_code}: {resp.text[:200]}")
+                    
+                data = resp.json()
+                return data["choices"][0]["message"]["content"].strip()
+                
+            except Exception as e:
+                last_exception = e
+                err_str = str(e)
+                if "PERMANENT_ERROR" in err_str:
+                    logger.error(f"Groq permanent error: {err_str}. Instantly triggering failover.")
+                    break
+                    
+                if attempt < max_retries:
+                    # Exponential backoff with random jitter to prevent synchronization
+                    backoff = (initial_backoff * (2 ** attempt)) + (random.random() * 0.2)
+                    logger.warning(f"Groq API call attempt {attempt + 1} failed: {e}. Retrying in {backoff:.2f}s...")
+                    time.sleep(backoff)
+                else:
+                    logger.warning(f"Groq API calls exhausted all {max_retries} retries. Initiating failover.")
+
+    # 1. Fallback Option A: OpenAI (GPT-4o-mini)
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        logger.info("Secondary provider failover active: routing request to OpenAI GPT-4o-mini...")
+        try:
+            openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            payload = {
+                "model": openai_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if response_format_json:
+                payload["response_format"] = {"type": "json_object"}
+                
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {openai_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=20,
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                logger.info("Successfully recovered from Groq failure using OpenAI fallback!")
+                return data["choices"][0]["message"]["content"].strip()
+            else:
+                logger.error(f"OpenAI fallback failed with HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as fallback_err:
+            logger.error(f"OpenAI fallback call failed: {fallback_err}")
+
+    # 2. Fallback Option B: Anthropic (Claude-3-5-Haiku)
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if anthropic_key:
+        logger.info("Secondary provider failover active: routing request to Anthropic Claude...")
+        try:
+            anthropic_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
+            
+            # Map OpenAI messages format to Anthropic format
+            system_content = ""
+            user_messages = []
+            for m in messages:
+                if m["role"] == "system":
+                    system_content += m["content"] + "\n"
+                else:
+                    user_messages.append({
+                        "role": m["role"],
+                        "content": m["content"]
+                    })
+                    
+            payload = {
+                "model": anthropic_model,
+                "system": system_content.strip(),
+                "messages": user_messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            
+            resp = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": anthropic_key,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=20,
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                logger.info("Successfully recovered from Groq failure using Anthropic fallback!")
+                return data["content"][0]["text"].strip()
+            else:
+                logger.error(f"Anthropic fallback failed with HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as fallback_err:
+            logger.error(f"Anthropic fallback call failed: {fallback_err}")
+
+    # If both primary and fallbacks fail, raise exception to trigger offline keyword fallback
+    raise RuntimeError(f"All LLM providers failed. Primary exception: {last_exception}")
+
+
 def _post_chat_completions(*, messages: list[dict[str, str]], max_tokens: int = 250) -> str:
-    """Call Groq's OpenAI-compatible chat completions endpoint and return content."""
-
-    payload: Dict[str, Any] = {
-        "model": config.groq_model,
-        "messages": messages,
-        "temperature": 0,
-        "max_tokens": max_tokens,
-        # Ask for strict JSON. Groq supports OpenAI-compatible response_format.
-        "response_format": {"type": "json_object"},
-    }
-
-    resp = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {config.groq_api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=30,
+    """Call chat completions and return strict JSON content (retries & failovers enabled)."""
+    return _post_chat_completions_with_retry(
+        messages=messages,
+        max_tokens=max_tokens,
+        response_format_json=True,
+        temperature=0.0
     )
-
-    if resp.status_code != 200:
-        raise RuntimeError(f"Groq HTTP {resp.status_code}: {resp.text[:300]}")
-
-    data = resp.json()
-    try:
-        return data["choices"][0]["message"]["content"].strip()
-    except Exception:
-        raise RuntimeError(f"Unexpected Groq response: {str(data)[:300]}")
 
 
 def classify_intent(message: str, session: dict) -> Dict[str, Any]:
@@ -349,33 +478,13 @@ def _post_chat_completions_text(
     max_tokens: int = 250,
     temperature: float = 0.4,
 ) -> str:
-    """Call Groq chat completions and return plain text content."""
-
-    payload: Dict[str, Any] = {
-        "model": config.groq_model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-
-    resp = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {config.groq_api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=30,
+    """Call chat completions and return plain text content (retries & failovers enabled)."""
+    return _post_chat_completions_with_retry(
+        messages=messages,
+        max_tokens=max_tokens,
+        response_format_json=False,
+        temperature=temperature
     )
-
-    if resp.status_code != 200:
-        raise RuntimeError(f"Groq HTTP {resp.status_code}: {resp.text[:300]}")
-
-    data = resp.json()
-    try:
-        return data["choices"][0]["message"]["content"].strip()
-    except Exception:
-        raise RuntimeError(f"Unexpected Groq response: {str(data)[:300]}")
 
 
 WATER_UTILITY_RESPONSE_SYSTEM_PROMPT = """You are an AI Water Utility Customer Support assistant.

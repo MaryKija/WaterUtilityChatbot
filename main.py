@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -113,6 +113,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def cookie_to_authorization_middleware(request: Request, call_next):
+    """Intercepts requests to automatically inject the secure HttpOnly cookie as a Bearer token."""
+    if "authorization" not in request.headers:
+        cookie_token = request.cookies.get("admin_session")
+        if cookie_token:
+            scope_headers = [h for h in request.scope.get("headers", []) if h[0].lower() != b"authorization"]
+            scope_headers.append((b"authorization", f"Bearer {cookie_token}".encode("utf-8")))
+            request.scope["headers"] = scope_headers
+    return await call_next(request)
+
 
 # Mount static files for production
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -772,15 +784,26 @@ class LoginResponse(BaseModel):
 
 
 @app.post("/auth/login", response_model=LoginResponse)
-def admin_login(request: LoginRequest):
-    """Authenticate admin user and return token."""
+def admin_login(request: Request, login_data: LoginRequest, response: Response):
+    """Authenticate admin user, issue JWT, and set secure HttpOnly cookie."""
     try:
-        user = auth_service.authenticate_user(request.username, request.password)
+        user = auth_service.authenticate_user(login_data.username, login_data.password)
         token = auth_service.generate_token(user)
+        
+        # Dynamically evaluate if we should set 'Secure' flag (HTTPS only in production)
+        is_secure = request.url.scheme == "https"
+        response.set_cookie(
+            key="admin_session",
+            value=token.token_hash,  # Set the full JWT token hash in the cookie
+            httponly=True,
+            secure=is_secure,
+            samesite="strict",
+            max_age=24 * 3600,  # 24 hours
+        )
         
         return LoginResponse(
             success=True,
-            token=token.token_hash,  # Return the actual token secret
+            token=token.token_hash,  # Still returned for backward compatibility
             user_id=user.user_id,
             role=user.role.value,
             expires_at=token.expires_at,
@@ -789,7 +812,7 @@ def admin_login(request: LoginRequest):
     except Exception as e:
         logger.warning(
             "auth.login_failed",
-            extra={"extra_data": {"username": request.username, "error": str(e)}}
+            extra={"extra_data": {"username": login_data.username, "error": str(e)}}
         )
         return LoginResponse(
             success=False,
@@ -798,14 +821,20 @@ def admin_login(request: LoginRequest):
 
 
 @app.post("/auth/logout")
-def admin_logout(authorization: str | None = Header(default=None)):
-    """Logout and revoke authentication token."""
+def admin_logout(response: Response, authorization: str | None = Header(default=None)):
+    """Logout, revoke JWT, and delete secure HttpOnly cookie."""
+    # We always delete the cookie regardless of authorization header presence
+    response.delete_cookie(
+        key="admin_session",
+        httponly=True,
+        samesite="strict"
+    )
+    
     if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
+        # If no authorization provided but cookie was deleted, just return success
+        return {"success": True, "message": "Logged out successfully"}
     
-    # Extract token from "Bearer <token>"
     token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
-    
     success = auth_service.revoke_token(token)
     
     if success:

@@ -211,7 +211,7 @@ function Settings() {
 // -------------------------------------------------------------
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("admin_token"));
+  const [authenticated, setAuthenticated] = useState<boolean>(!!localStorage.getItem("admin_user"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -223,10 +223,11 @@ export default function App() {
     setError(null);
     try {
       const res = await api.login(username, password);
-      if (res.success && res.token) {
-        localStorage.setItem("admin_token", res.token);
+      if (res.success) {
+        // Clear plain text token from localStorage for XSS protection
+        localStorage.removeItem("admin_token");
         localStorage.setItem("admin_user", JSON.stringify({ user_id: res.user_id, role: res.role }));
-        setToken(res.token);
+        setAuthenticated(true);
       } else {
         setError(res.message || "Invalid credentials");
       }
@@ -237,13 +238,18 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      // Ignore API logout failures (e.g. if already expired or unreachable)
+    }
     localStorage.removeItem("admin_token");
     localStorage.removeItem("admin_user");
-    setToken(null);
+    setAuthenticated(false);
   };
 
-  if (!token) {
+  if (!authenticated) {
     return (
       <div style={{
         minHeight: "100vh",

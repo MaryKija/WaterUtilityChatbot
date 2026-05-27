@@ -9,13 +9,13 @@ This module provides:
 - Audit logging for admin actions
 """
 
-from __future__ import annotations
-
 import hashlib
 import os
 import secrets
 import time
 import re
+import base64
+import json
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -23,6 +23,18 @@ from enum import Enum
 
 from .logger import logger
 from .storage import _connect, ADMIN_RESOLUTION_TABLE
+
+def base64url_encode(data: bytes) -> str:
+    """Base64URL encode according to RFC 7515 (no padding, url-safe)."""
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+
+def base64url_decode(s: str) -> bytes:
+    """Base64URL decode according to RFC 7515 (restores padding if missing)."""
+    rem = len(s) % 4
+    if rem > 0:
+        s += '=' * (4 - rem)
+    return base64.urlsafe_b64decode(s.encode('utf-8'))
+
 
 
 class UserRole(Enum):
@@ -226,94 +238,225 @@ class AuthService:
         return AdminUser(**user_data)
     
     def generate_token(self, user: AdminUser, expires_hours: int = 24) -> AuthToken:
-        """Generate authentication token for user and persist it to SQLite."""
-        token_id = f"TKN_{secrets.token_hex(16)}"
-        token_secret = secrets.token_urlsafe(32)
+        """Generate a secure stateless/stateful hybrid JWT and persist its JTI to the database."""
+        jti = f"JTI_{secrets.token_hex(16)}"
+        created_dt = datetime.now(timezone.utc)
+        expires_dt = created_dt + timedelta(hours=expires_hours)
 
-        expires_at = (datetime.now(timezone.utc) + timedelta(hours=expires_hours)).isoformat()
-        created_at = datetime.now(timezone.utc).isoformat()
+        # Standard JWT Header & Payload
+        header = {"alg": "HS256", "typ": "JWT"}
+        payload = {
+            "jti": jti,
+            "sub": user.user_id,
+            "role": user.role.value,
+            "permissions": [p.value for p in user.permissions],
+            "iat": int(created_dt.timestamp()),
+            "exp": int(expires_dt.timestamp())
+        }
 
-        # Persist to database so the token survives server restarts
+        # Serialize and encode payload
+        header_b64 = base64url_encode(json.dumps(header).encode('utf-8'))
+        payload_b64 = base64url_encode(json.dumps(payload).encode('utf-8'))
+
+        signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+        secret_key = os.getenv("JWT_SECRET_KEY") or os.getenv("ADMIN_TOKEN") or "fallback_super_secret_key_123!"
+
+        import hmac
+        signature = hmac.new(secret_key.encode('utf-8'), signing_input, hashlib.sha256).digest()
+        signature_b64 = base64url_encode(signature)
+
+        jwt_token = f"{header_b64}.{payload_b64}.{signature_b64}"
+
+        expires_at_iso = expires_dt.isoformat()
+        created_at_iso = created_dt.isoformat()
+
+        # Persist to database so the JTI survives server restarts and can be revoked
         with _connect() as conn:
             conn.execute(
                 """
                 INSERT INTO auth_tokens (token_id, user_id, token_secret, expires_at, created_at, active)
                 VALUES (?, ?, ?, ?, ?, 1)
                 """,
-                (token_id, user.user_id, token_secret, expires_at, created_at),
+                (jti, user.user_id, jwt_token, expires_at_iso, created_at_iso),
             )
 
         self._log_security_event("token_generated", "auth", {
             "user_id": user.user_id,
-            "token_id": token_id,
-            "expires_at": expires_at,
+            "jti": jti,
+            "expires_at": expires_at_iso,
         })
 
         return AuthToken(
-            token_id=token_id,
+            token_id=jti,
             user_id=user.user_id,
-            token_hash=token_secret,   # Return the secret to the caller
-            expires_at=expires_at,
-            created_at=created_at,
+            token_hash=jwt_token,   # Return the full JWT to the caller
+            expires_at=expires_at_iso,
+            created_at=created_at_iso,
             permissions=user.permissions,
             active=True,
         )
 
     def verify_token(self, token: str) -> Optional[AdminUser]:
-        """Verify authentication token against SQLite (survives restarts)."""
+        """Verify the hybrid JWT statelessly (cryptography) and statefully (revocation check)."""
         if not token:
             return None
 
-        now = datetime.now(timezone.utc).isoformat()
+        # 1. Parse JWT structure
+        parts = token.split('.')
+        if len(parts) != 3:
+            # Fallback to checking the token directly in the database (backward compatibility for non-JWT tokens)
+            now = datetime.now(timezone.utc).isoformat()
+            with _connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT token_id, user_id, expires_at, active
+                    FROM auth_tokens
+                    WHERE token_secret = ? AND active = 1 AND expires_at > ?
+                    """,
+                    (token, now),
+                ).fetchone()
+            if not row:
+                self._log_security_event("invalid_token", "auth", {
+                    "reason": "malformed_jwt_structure_and_not_in_db",
+                })
+                return None
+            token_id, user_id, expires_at, active = row
+            # Update last_used timestamp
+            with _connect() as conn:
+                conn.execute(
+                    "UPDATE auth_tokens SET last_used = ? WHERE token_id = ?",
+                    (now, token_id),
+                )
+            # Resolve user
+            for admin_data in self._default_admins.values():
+                if admin_data["user_id"] == user_id:
+                    return AdminUser(**admin_data)
+            return None
 
+        header_b64, payload_b64, signature_b64 = parts
+
+        # 2. Cryptographic signature check
+        try:
+            signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+            secret_key = os.getenv("JWT_SECRET_KEY") or os.getenv("ADMIN_TOKEN") or "fallback_super_secret_key_123!"
+            import hmac
+            expected_sig = hmac.new(secret_key.encode('utf-8'), signing_input, hashlib.sha256).digest()
+            expected_sig_b64 = base64url_encode(expected_sig)
+
+            # Constant-time comparison
+            import hmac as _hmac
+            if not _hmac.compare_digest(signature_b64.encode('utf-8'), expected_sig_b64.encode('utf-8')):
+                self._log_security_event("invalid_token", "auth", {
+                    "reason": "signature_mismatch",
+                })
+                return None
+
+            # Decode payload
+            payload_json = base64url_decode(payload_b64).decode('utf-8')
+            payload = json.loads(payload_json)
+        except Exception as e:
+            self._log_security_event("invalid_token", "auth", {
+                "reason": f"decode_error: {str(e)}",
+            })
+            return None
+
+        # 3. Check expiration statelessly
+        exp = payload.get("exp")
+        jti = payload.get("jti")
+        user_id = payload.get("sub")
+
+        if not exp or not jti or not user_id:
+            self._log_security_event("invalid_token", "auth", {
+                "reason": "missing_required_claims",
+            })
+            return None
+
+        now_ts = int(time.time())
+        if now_ts > exp:
+            self._log_security_event("invalid_token", "auth", {
+                "reason": "token_expired_stateless",
+                "jti": jti,
+            })
+            return None
+
+        # 4. Stateful revocation / database check
+        now_iso = datetime.now(timezone.utc).isoformat()
         with _connect() as conn:
             row = conn.execute(
                 """
-                SELECT token_id, user_id, expires_at, active
+                SELECT token_id, active, expires_at
                 FROM auth_tokens
-                WHERE token_secret = ? AND active = 1 AND expires_at > ?
+                WHERE token_id = ? AND active = 1 AND expires_at > ?
                 """,
-                (token, now),
+                (jti, now_iso),
             ).fetchone()
 
         if not row:
             self._log_security_event("invalid_token", "auth", {
-                "reason": "not_found_or_expired",
+                "reason": "revoked_or_expired_stateful",
+                "jti": jti,
             })
             return None
 
-        token_id, user_id, expires_at, active = row
-
-        # Update last_used timestamp
+        # 5. Update last_used timestamp statefully
         with _connect() as conn:
             conn.execute(
                 "UPDATE auth_tokens SET last_used = ? WHERE token_id = ?",
-                (now, token_id),
+                (now_iso, jti),
             )
 
-        # Resolve user from in-memory registry
+        # 6. Resolve user from registry
         user_data = None
         for admin_data in self._default_admins.values():
             if admin_data["user_id"] == user_id:
-                user_data = admin_data
+                user_data = admin_data.copy()
                 break
 
         if not user_data:
+            self._log_security_event("invalid_token", "auth", {
+                "reason": "user_not_found_in_registry",
+                "user_id": user_id,
+            })
             return None
 
         return AdminUser(**user_data)
 
     def revoke_token(self, token: str) -> bool:
-        """Revoke authentication token in SQLite."""
+        """Revoke the JWT statefully by flagging its JTI as inactive in the database."""
+        if not token:
+            return False
+
+        # Try to parse and extract JTI
+        jti = None
+        parts = token.split('.')
+        if len(parts) == 3:
+            try:
+                payload_b64 = parts[1]
+                payload_json = base64url_decode(payload_b64).decode('utf-8')
+                payload = json.loads(payload_json)
+                jti = payload.get("jti")
+            except Exception:
+                pass
+
+        # Revoke by JTI or full token string in the DB (covers JWT and legacy cases)
         with _connect() as conn:
-            cur = conn.execute(
-                "UPDATE auth_tokens SET active = 0 WHERE token_secret = ?",
-                (token,),
-            )
+            if jti:
+                cur = conn.execute(
+                    "UPDATE auth_tokens SET active = 0 WHERE token_id = ? OR token_secret = ?",
+                    (jti, token),
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE auth_tokens SET active = 0 WHERE token_secret = ?",
+                    (token,),
+                )
             revoked = cur.rowcount > 0
 
         if revoked:
-            self._log_security_event("token_revoked", "auth", {"token_prefix": token[:12] + "..."})
+            self._log_security_event("token_revoked", "auth", {
+                "jti": jti,
+                "token_prefix": token[:12] + "..."
+            })
 
         return revoked
     
