@@ -93,47 +93,53 @@ const Index = () => {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
 
-  // Poll for human-agent replies while escalated.
+  // Establish WebSocket connection for real-time operator overrides
   useEffect(() => {
-    if (!isEscalated) return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // Fallback to localhost if host is empty (e.g. during local tests)
+    const host = window.location.host || "localhost:8000";
+    const wsUrl = `${protocol}//${host}/ws/chat/${userId}`;
+    
+    console.log("Connecting to WebSocket:", wsUrl);
+    const socket = new WebSocket(wsUrl);
 
-    const interval = window.setInterval(() => {
-      void (async () => {
-        try {
-          const data = (await getChatUpdates(userId, updatesAfter)) as {
-            status: "none" | "WAITING" | "ACTIVE" | "CLOSED";
-            messages: Array<{ sender: "user" | "bot" | "agent"; text: string; created_at?: string }>;
-            next_after: number;
-          };
-
-          if (data.status === "none" || data.status === "CLOSED") {
-            setIsEscalated(false);
-            setUpdatesAfter(0);
-            return;
-          }
-
-          const newAgentMsgs = (data.messages ?? []).filter((m) => m.sender === "agent");
-          if (newAgentMsgs.length > 0) {
-            setMessages((prev) => [
+    socket.onmessage = (event) => {
+      try {
+        if (event.data === "pong") return;
+        const msg = JSON.parse(event.data);
+        if (msg && msg.sender === "agent") {
+          setIsEscalated(true);
+          setMessages((prev) => {
+            // Avoid duplicate messages
+            if (prev.some((m) => m.text === msg.text && m.sender === "agent")) return prev;
+            return [
               ...prev,
-              ...newAgentMsgs.map((m) => ({
+              {
                 id: `agent-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                text: m.text,
+                text: msg.text,
                 sender: "agent" as const,
-                timestamp: new Date(m.created_at ?? Date.now()),
-              })),
-            ]);
-          }
-
-          setUpdatesAfter(data.next_after ?? updatesAfter);
-        } catch {
-          // Ignore transient polling errors.
+                timestamp: new Date(msg.created_at ?? Date.now()),
+              }
+            ];
+          });
         }
-      })();
-    }, 2000);
+      } catch (err) {
+        console.error("Error parsing WebSocket message:", err);
+      }
+    };
 
-    return () => window.clearInterval(interval);
-  }, [isEscalated, updatesAfter, userId]);
+    // Keepalive ping every 30 seconds
+    const pingInterval = window.setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send("ping");
+      }
+    }, 30000);
+
+    return () => {
+      window.clearInterval(pingInterval);
+      socket.close();
+    };
+  }, [userId]);
 
   const handleSend = (text: string) => {
     const userMsg: ChatMessage = {

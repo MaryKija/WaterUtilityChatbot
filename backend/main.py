@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -70,6 +70,49 @@ logger.info(f"Groq LLM configured with model: {config.groq_model}")
 # FastAPI App Setup
 # ---------------------------
 app = FastAPI(title="Water Utility Chatbot", version="1.0.0")
+
+# Real-time WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+        logger.info(f"WebSocket connected for user: {user_id}")
+
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+            logger.info(f"WebSocket disconnected for user: {user_id}")
+
+    async def send_message(self, user_id: str, message: dict):
+        if user_id in self.active_connections:
+            websocket = self.active_connections[user_id]
+            try:
+                await websocket.send_json(message)
+                logger.info(f"Real-time message pushed to user: {user_id}")
+                return True
+            except Exception as e:
+                logger.warning(f"Failed to push WebSocket message to user {user_id}: {e}")
+                self.disconnect(user_id)
+        return False
+
+ws_manager = ConnectionManager()
+
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_chat(websocket: WebSocket, user_id: str):
+    await ws_manager.connect(user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(user_id)
+    except Exception as e:
+        logger.warning(f"WebSocket connection error for user {user_id}: {e}")
+        ws_manager.disconnect(user_id)
 
 # Production CORS: allow all origins for demo purposes
 # In production, you should restrict this to your domain
@@ -355,7 +398,7 @@ def admin_get_escalation(escalation_id: str):
 
 
 @app.post("/admin/escalations/{escalation_id}/reply")
-def admin_reply_escalation(escalation_id: str, body: EscalationReplyCreate):
+async def admin_reply_escalation(escalation_id: str, body: EscalationReplyCreate):
     msg = (body.message or "").strip()
     if not msg:
         raise HTTPException(status_code=400, detail="message cannot be empty")
@@ -373,12 +416,19 @@ def admin_reply_escalation(escalation_id: str, body: EscalationReplyCreate):
             context_manager.acquire_operator_takeover_lock(e.user_id)
         except Exception as exc:
             logger.warning(f"Failed to acquire operator takeover lock for user {e.user_id}: {exc}")
+        
+        # Real-time WebSocket push to customer interface
+        await ws_manager.send_message(e.user_id, {
+            "sender": "agent",
+            "text": msg,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
             
     return {"success": True, "escalation": asdict(e) if e else None}
 
 
 @app.post("/admin/escalations/{escalation_id}/close")
-def admin_close_escalation(escalation_id: str):
+async def admin_close_escalation(escalation_id: str):
     e = storage_get_escalation(escalation_id)
     ok = storage_close_escalation(escalation_id)
     if not ok:

@@ -30,6 +30,10 @@ from typing import Any, Dict, Literal, Optional, Tuple
 import requests
 import redis
 
+from .config import config
+from .logger import logger
+from .validators import is_valid_account, is_valid_name, is_valid_phone, normalize_phone
+
 # -----------------------------------------------------------------------------
 # Optional Redis State & Handoff Lock Engine
 # -----------------------------------------------------------------------------
@@ -45,10 +49,6 @@ if REDIS_URL:
     except Exception as e:
         logger.warning(f"Failed to connect to Redis at {REDIS_URL}, falling back to database storage. Error: {e}")
         redis_client = None
-
-from .config import config
-from .logger import logger
-from .validators import is_valid_account, is_valid_name, is_valid_phone, normalize_phone
 
 
 Role = Literal["user", "bot"]
@@ -170,7 +170,7 @@ class ContextManager:
         if redis_client:
             try:
                 cached = redis_client.get(f"session:{uid}")
-                if cached:
+                if cached and isinstance(cached, (str, bytes, bytearray)):
                     ctx = json.loads(cached)
                     if isinstance(ctx, dict):
                         # Ensure all schema fields exist
