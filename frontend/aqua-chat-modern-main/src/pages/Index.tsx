@@ -76,7 +76,7 @@ const suggestedFollowUps = [
 
 const Index = () => {
   const [userId] = useState(() => getSessionUserId());
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
   const [intent, setIntent] = useState("-");
   const [confidence, setConfidence] = useState("");
