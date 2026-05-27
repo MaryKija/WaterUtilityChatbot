@@ -31,7 +31,8 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         placeholder="Type your message…"
         disabled={disabled}
         autoComplete="off"
-        className="flex-1 rounded-xl border border-border bg-chat-input-bg px-4 py-3 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground/60 focus:border-primary/50 focus:bg-card focus:ring-2 focus:ring-primary/10 disabled:opacity-50"
+        aria-label="Type your water utility question or message"
+        className="flex-1 rounded-xl border border-border bg-chat-input-bg px-4 py-3 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground/60 focus:border-primary/50 focus:bg-card focus:ring-2 focus:ring-primary/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none disabled:opacity-50"
       />
       <button
         type="submit"

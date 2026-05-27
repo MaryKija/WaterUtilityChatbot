@@ -657,3 +657,37 @@ tr:hover td {
     opacity: 1;
   }
 }
+
+/* Accessibility Skip Link styling */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.focus\:not-sr-only:focus {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 9999;
+  width: auto;
+  height: auto;
+  padding: 10px 20px;
+  background-color: var(--color-primary);
+  color: white;
+  font-weight: 700;
+  border-radius: 8px;
+  clip: auto;
+  overflow: visible;
+}
+
+/* Keyboard focus indicators */
+:focus-visible {
+  outline: 3px solid var(--color-primary-dark, #0369a1);
+  outline-offset: 2px;
+}

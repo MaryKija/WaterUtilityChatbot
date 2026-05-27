@@ -41,23 +41,27 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
               ? "bg-emerald-500/15 shadow-emerald-500/10 group-hover:shadow-emerald-500/25 group-hover:shadow-lg"
               : "bg-primary/10 shadow-primary/10 group-hover:shadow-primary/25 group-hover:shadow-lg"
         }`}
+        aria-hidden="true"
       >
         <motion.div
           animate={{ y: [0, -2, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: index * 0.3 }}
         >
           {isUser ? (
-            <User className="h-3.5 w-3.5 text-primary" />
+            <User className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           ) : isAgent ? (
-            <Headset className="h-3.5 w-3.5 text-emerald-600" />
+            <Headset className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
           ) : (
-            <Bot className="h-3.5 w-3.5 text-primary" />
+            <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           )}
         </motion.div>
       </motion.div>
 
       {/* Bubble + meta */}
       <div className={`flex max-w-[75%] flex-col ${isUser ? "items-end" : "items-start"}`}>
+        <span className="sr-only">
+          {isUser ? "Your message:" : isAgent ? "Agent reply:" : "Bot reply:"}
+        </span>
         {!isUser && (
           <motion.span
             initial={{ opacity: 0 }}
@@ -118,7 +122,7 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
             <button
               type="button"
               onClick={() => alert(`Opening Statement details for ${message.attachment?.id}...`)}
-              className="w-full rounded-lg bg-primary py-2 text-center text-xs font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/95 active:scale-98"
+              className="w-full rounded-lg bg-primary py-2 text-center text-xs font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none active:scale-98"
             >
               {message.attachment.action}
             </button>
@@ -134,7 +138,7 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
           }`}
         >
           <span>{time}</span>
-          {isUser && <CheckCheck className="h-3 w-3 text-primary" />}
+          {isUser && <CheckCheck className="h-3 w-3 text-primary" aria-hidden="true" />}
         </motion.div>
 
         {message.showSatisfactionRating && (

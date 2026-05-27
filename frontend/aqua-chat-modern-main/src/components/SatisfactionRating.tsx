@@ -54,14 +54,14 @@ const SatisfactionRating = ({ onRating, messageId }: SatisfactionRatingProps) =>
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleRating(star)}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                   rating === star
                     ? "text-yellow-500"
                     : "text-gray-400 hover:text-yellow-400"
                 }`}
                 aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
               >
-                <Star className={`h-4 w-4 ${rating === star ? "fill-current" : ""}`} />
+                <Star className={`h-4 w-4 ${rating === star ? "fill-current" : ""}`} aria-hidden="true" />
               </motion.button>
             ))}
           </div>
@@ -70,27 +70,27 @@ const SatisfactionRating = ({ onRating, messageId }: SatisfactionRatingProps) =>
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => handleRating(5)}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-2 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                 rating === 5
                   ? "bg-green-100 text-green-700"
                   : "bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600"
               }`}
               aria-label="Thumbs up"
             >
-              <ThumbsUp className="h-4 w-4" />
+              <ThumbsUp className="h-4 w-4" aria-hidden="true" />
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => handleRating(1)}
-              className={`p-2 rounded-full transition-colors ${
+              className={`p-2 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none ${
                 rating === 1
                   ? "bg-red-100 text-red-700"
                   : "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600"
               }`}
               aria-label="Thumbs down"
             >
-              <ThumbsDown className="h-4 w-4" />
+              <ThumbsDown className="h-4 w-4" aria-hidden="true" />
             </motion.button>
           </div>
         </div>
@@ -109,7 +109,8 @@ const SatisfactionRating = ({ onRating, messageId }: SatisfactionRatingProps) =>
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="Please share your feedback..."
-            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none"
+            aria-label="Please explain why the response was unsatisfactory"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             rows={3}
           />
           <div className="flex gap-2">
@@ -117,7 +118,7 @@ const SatisfactionRating = ({ onRating, messageId }: SatisfactionRatingProps) =>
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={submitFeedback}
-              className="flex-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="flex-1 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Submit Feedback
             </motion.button>
@@ -125,7 +126,7 @@ const SatisfactionRating = ({ onRating, messageId }: SatisfactionRatingProps) =>
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={skipFeedback}
-              className="rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+              className="rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Skip
             </motion.button>

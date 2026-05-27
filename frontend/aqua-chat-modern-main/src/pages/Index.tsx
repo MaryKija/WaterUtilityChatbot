@@ -226,7 +226,7 @@ const Index = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[hsl(185,60%,25%)] via-[hsl(200,50%,30%)] to-[hsl(220,40%,20%)] p-4 sm:p-6">
       {/* Decorative background orbs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-[hsl(var(--chat-glow))] opacity-[0.07] blur-3xl" />
         <div className="absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-primary opacity-[0.05] blur-3xl" />
       </div>
@@ -234,22 +234,30 @@ const Index = () => {
       {/* Admin shortcut (outside of chat components) */}
       <Link
         to="/admin"
-        className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/30 animate-pulse hover:animate-none"
+        className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none animate-pulse hover:animate-none"
+        aria-label="Go to Admin Panel"
       >
         Admin Panel
-        <Shield className="h-3.5 w-3.5" />
+        <Shield className="h-3.5 w-3.5" aria-hidden="true" />
       </Link>
 
-      <motion.div
+      <motion.main
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="relative flex h-[800px] max-h-[90vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-card shadow-2xl shadow-black/20 ring-1 ring-white/10"
+        role="main"
+        aria-label="Water Utility Assistant"
       >
         <ChatHeader intent={intent} confidence={confidence} onClear={handleClear} />
 
         {/* Messages area */}
-        <div className="chat-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto bg-chat-bg p-6">
+        <div 
+          className="chat-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto bg-chat-bg p-6"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
           {isInitialChat && <WelcomeHero />}
           {messages.map((msg, i) => (
             <MessageBubble key={msg.id} message={msg} index={i} />
@@ -259,9 +267,9 @@ const Index = () => {
         </div>
 
         {/* Persistent Quick Actions Grid */}
-        <div className="border-t border-border/60 bg-card px-6 py-3.5">
+        <div className="border-t border-border/60 bg-card px-6 py-3.5" role="region" aria-label="Quick Actions">
           <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Droplets className="h-3 w-3 text-primary animate-pulse" />
+            <Droplets className="h-3 w-3 text-primary animate-pulse" aria-hidden="true" />
             Quick actions
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
@@ -270,7 +278,8 @@ const Index = () => {
                 key={item.label}
                 type="button"
                 onClick={() => handleSend(item.query)}
-                className="rounded-xl border border-border/60 bg-chat-input-bg px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-accent/50 hover:shadow active:scale-95 text-center overflow-hidden text-ellipsis whitespace-nowrap"
+                aria-label={`Ask: ${item.label}`}
+                className="rounded-xl border border-border/60 bg-chat-input-bg px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-accent/50 hover:shadow active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none text-center overflow-hidden text-ellipsis whitespace-nowrap"
               >
                 {item.label}
               </button>
@@ -286,7 +295,7 @@ const Index = () => {
             LgWSC assistant may provide automated information. Verify important billing details.
           </p>
         </div>
-      </motion.div>
+      </motion.main>
     </div>
   );
 };

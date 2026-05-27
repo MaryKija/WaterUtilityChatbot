@@ -47,8 +47,8 @@ intent_engine = IntentPipeline()
 orchestrator = Orchestrator(config, context_manager, intent_engine, tool_executor)
 
 
-def _require_admin(authorization: str | None) -> None:
-    """Verify the request carries a valid admin credential.
+def _require_admin(authorization: str | None) -> str:
+    """Verify the request carries a valid admin credential and return the admin identifier.
 
     Accepts two token types so both auth flows work:
     1. Static ADMIN_TOKEN from .env  — used by scripts / curl / legacy tools
@@ -62,12 +62,12 @@ def _require_admin(authorization: str | None) -> None:
     # --- Path 1: static ADMIN_TOKEN ---
     admin_token = os.getenv("ADMIN_TOKEN")
     if admin_token and provided == admin_token:
-        return  # valid
+        return "static_admin"  # valid
 
     # --- Path 2: session token issued by /auth/login ---
     user = auth_service.verify_token(provided)
     if user is not None:
-        return  # valid session token
+        return user.username  # valid session token
 
     raise HTTPException(status_code=403, detail="Invalid or expired admin token")
 
@@ -431,9 +431,21 @@ def admin_reset_pin(
         500  on an unexpected database error.
     """
     import sqlite3 as _sqlite3
+    from backend.storage import DB_PATH, CUSTOMER_AUTH_TABLE
+    from backend.auth import auth_service
 
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
     from backend.customer_auth import customer_auth_service
+
+    # Fetch before state
+    before_state = None
+    try:
+        with _sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(f"SELECT pin_hash, pin_salt, failed_attempts, locked_until FROM {CUSTOMER_AUTH_TABLE} WHERE account_number = ?", (account_number,)).fetchone()
+            if row:
+                before_state = {"pin_hash": row[0], "pin_salt": row[1], "failed_attempts": row[2], "locked_until": row[3]}
+    except Exception:
+        pass
 
     try:
         customer_auth_service.reset_pin(account_number, body.new_pin)
@@ -445,16 +457,50 @@ def admin_reset_pin(
     except _sqlite3.Error:
         raise HTTPException(status_code=500, detail="Internal server error")
 
+    # Fetch after state
+    after_state = None
+    try:
+        with _sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(f"SELECT pin_hash, pin_salt, failed_attempts, locked_until FROM {CUSTOMER_AUTH_TABLE} WHERE account_number = ?", (account_number,)).fetchone()
+            if row:
+                after_state = {"pin_hash": row[0], "pin_salt": row[1], "failed_attempts": row[2], "locked_until": row[3]}
+    except Exception:
+        pass
+
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="RESET_PIN",
+        resource=account_number,
+        before_state=before_state,
+        after_state=after_state
+    )
+
     return {"status": "ok", "account_number": account_number}
 
 
 @app.post("/admin/escalations/{escalation_id}/close")
 def admin_close_escalation(escalation_id: str, authorization: str | None = Header(default=None)):
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
+    from backend.storage import get_escalation
+    from backend.auth import auth_service
+    from dataclasses import asdict
+
+    before_esc = get_escalation(escalation_id)
+    before_state = asdict(before_esc) if before_esc else None
+
     ok = storage_close_escalation(escalation_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Escalation not found")
     e = storage_get_escalation(escalation_id)
+    after_state = asdict(e) if e else None
+
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="CLOSE_ESCALATION",
+        resource=escalation_id,
+        before_state=before_state,
+        after_state=after_state
+    )
     return {"success": True, "escalation": _escalation_to_dict(e) if e else None}
 
 
@@ -545,8 +591,9 @@ def admin_label_intent_suggestion(
     body: IntentLabelRequest,
     authorization: str | None = Header(default=None),
 ):
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
     from backend.storage import DB_PATH, INTENT_SUGGESTIONS_TABLE, INTENT_LABELS_TABLE
+    from backend.auth import auth_service
     import sqlite3
 
     sid = (suggestion_id or "").strip().upper()
@@ -558,11 +605,12 @@ def admin_label_intent_suggestion(
 
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
-            f"SELECT suggestion_id FROM {INTENT_SUGGESTIONS_TABLE} WHERE suggestion_id = ?",
+            f"SELECT label_suggestion, status FROM {INTENT_SUGGESTIONS_TABLE} WHERE suggestion_id = ?",
             (sid,),
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Suggestion not found")
+        before_state = {"label": row[0], "status": row[1]}
 
         conn.execute(
             f"""INSERT INTO {INTENT_LABELS_TABLE}(suggestion_id, label, approved_by, notes, created_at)
@@ -574,10 +622,24 @@ def admin_label_intent_suggestion(
             (datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(), sid),
         )
         conn.commit()
+        
+        row_after = conn.execute(
+            f"SELECT label_suggestion, status FROM {INTENT_SUGGESTIONS_TABLE} WHERE suggestion_id = ?",
+            (sid,),
+        ).fetchone()
+        after_state = {"label": row_after[0], "status": row_after[1]} if row_after else None
 
     logger.info(
         "intent_discovery.label",
         extra={"extra_data": {"suggestion_id": sid, "label": label, "approved_by": approved_by}},
+    )
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="LABEL_INTENT_SUGGESTION",
+        resource=sid,
+        before_state=before_state,
+        after_state=after_state
     )
     return {"success": True, "suggestion_id": sid, "label": label}
 
@@ -593,8 +655,9 @@ def admin_deploy_intent_suggestion(
     Hard requirement: never auto-deploy to production. This endpoint only stages.
     """
 
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
     from backend.storage import DB_PATH, INTENT_SUGGESTIONS_TABLE, INTENT_CANDIDATES_TABLE, INTENT_LABELS_TABLE
+    from backend.auth import auth_service
     import sqlite3
 
     sid = (suggestion_id or "").strip().upper()
@@ -610,6 +673,8 @@ def admin_deploy_intent_suggestion(
             raise HTTPException(status_code=404, detail="Suggestion not found")
         if str(sug[2]) not in {"APPROVED", "DEPLOYED"}:
             raise HTTPException(status_code=400, detail="Suggestion must be APPROVED before deploy")
+            
+        before_state = {"status": sug[2], "deployed": False}
 
         # Require at least one human label record before staging.
         lbl = conn.execute(
@@ -634,10 +699,25 @@ def admin_deploy_intent_suggestion(
             (now, sid),
         )
         conn.commit()
+        
+        after_state = {
+            "status": "DEPLOYED",
+            "candidate_id": candidate_id,
+            "active": False,
+            "approvals": approvals
+        }
 
     logger.info(
         "intent_discovery.deploy_staging",
         extra={"extra_data": {"suggestion_id": sid, "candidate_id": candidate_id, "label": label}},
+    )
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="DEPLOY_INTENT_SUGGESTION",
+        resource=sid,
+        before_state=before_state,
+        after_state=after_state
     )
     return {"success": True, "candidate_id": candidate_id, "active": False}
 
@@ -657,8 +737,9 @@ def admin_activate_intent_candidate(
     - Two human approvals required unless role==admin.
     """
 
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
     from backend.storage import DB_PATH, INTENT_CANDIDATES_TABLE
+    from backend.auth import auth_service
     import sqlite3
 
     cid = (candidate_id or "").strip().upper()
@@ -673,6 +754,8 @@ def admin_activate_intent_candidate(
         ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Candidate not found")
+            
+        before_state = {"approvals": json.loads(row[0] or "[]"), "active": bool(int(row[1] or 0))}
 
         try:
             approvals = json.loads(row[0] or "[]")
@@ -692,10 +775,20 @@ def admin_activate_intent_candidate(
             (json.dumps(approvals), active, now, cid),
         )
         conn.commit()
+        
+        after_state = {"approvals": approvals, "active": bool(active)}
 
     logger.info(
         "intent_discovery.activate",
         extra={"extra_data": {"candidate_id": cid, "active": bool(active), "approver": approver, "role": role}},
+    )
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="ACTIVATE_INTENT_CANDIDATE",
+        resource=cid,
+        before_state=before_state,
+        after_state=after_state
     )
     return {"success": True, "candidate_id": cid, "active": bool(active), "unique_approvers": len(unique_approvers)}
 
@@ -704,24 +797,41 @@ def admin_activate_intent_candidate(
 def admin_deactivate_intent_candidate(
     candidate_id: str, authorization: str | None = Header(default=None)
 ):
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
     from backend.storage import DB_PATH, INTENT_CANDIDATES_TABLE
+    from backend.auth import auth_service
     import sqlite3
 
     cid = (candidate_id or "").strip().upper()
     now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
     with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            f"SELECT approvals_json, active FROM {INTENT_CANDIDATES_TABLE} WHERE candidate_id = ?",
+            (cid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        before_state = {"approvals": json.loads(row[0] or "[]"), "active": bool(int(row[1] or 0))}
+
         cur = conn.execute(
             f"UPDATE {INTENT_CANDIDATES_TABLE} SET active = 0, updated_at = ? WHERE candidate_id = ?",
             (now, cid),
         )
-        if cur.rowcount <= 0:
-            raise HTTPException(status_code=404, detail="Candidate not found")
         conn.commit()
+        
+        after_state = {"approvals": before_state["approvals"], "active": False}
 
     logger.info(
         "intent_discovery.deactivate",
         extra={"extra_data": {"candidate_id": cid}},
+    )
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="DEACTIVATE_INTENT_CANDIDATE",
+        resource=cid,
+        before_state=before_state,
+        after_state=after_state
     )
     return {"success": True, "candidate_id": cid, "active": False}
 
@@ -1060,7 +1170,12 @@ def admin_update_complaint_status(
     authorization: str | None = Header(default=None),
 ):
     """Update a complaint status from the admin UI."""
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
+    from backend.auth import auth_service
+    
+    before_c = storage_get_complaint(ticket_id)
+    before_state = _complaint_to_dict(before_c) if before_c else None
+    
     try:
         ok = storage_set_complaint_status(ticket_id, body.status)
     except ValueError as exc:
@@ -1070,11 +1185,20 @@ def admin_update_complaint_status(
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     complaint = storage_get_complaint(ticket_id)
+    after_state = _complaint_to_dict(complaint) if complaint else None
     logger.info(
         "admin.complaint_status_updated",
         extra={"extra_data": {"ticket_id": ticket_id, "status": body.status}},
     )
-    return {"success": True, "complaint": _complaint_to_dict(complaint)}
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="UPDATE_COMPLAINT_STATUS",
+        resource=ticket_id,
+        before_state=before_state,
+        after_state=after_state
+    )
+    return {"success": True, "complaint": after_state}
 
 
 @app.post("/admin/complaints/{ticket_id}/note")
@@ -1084,7 +1208,12 @@ def admin_add_complaint_note(
     authorization: str | None = Header(default=None),
 ):
     """Add an internal admin note to a complaint."""
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
+    from backend.auth import auth_service
+    
+    before_c = storage_get_complaint(ticket_id)
+    before_state = _complaint_to_dict(before_c) if before_c else None
+    
     try:
         ok = storage_add_complaint_note(ticket_id, body.note, author="admin")
     except ValueError as exc:
@@ -1094,8 +1223,17 @@ def admin_add_complaint_note(
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     complaint = storage_get_complaint(ticket_id)
+    after_state = _complaint_to_dict(complaint) if complaint else None
     logger.info("admin.complaint_note_added", extra={"extra_data": {"ticket_id": ticket_id}})
-    return {"success": True, "complaint": _complaint_to_dict(complaint)}
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="ADD_COMPLAINT_NOTE",
+        resource=ticket_id,
+        before_state=before_state,
+        after_state=after_state
+    )
+    return {"success": True, "complaint": after_state}
 
 
 @app.post("/admin/complaints/{ticket_id}/assign")
@@ -1105,15 +1243,29 @@ def admin_assign_complaint(
     authorization: str | None = Header(default=None),
 ):
     """Assign or clear a complaint owner."""
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
+    from backend.auth import auth_service
+    
+    before_c = storage_get_complaint(ticket_id)
+    before_state = _complaint_to_dict(before_c) if before_c else None
+    
     ok = storage_assign_complaint(ticket_id, body.assigned_to)
 
     if not ok:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     complaint = storage_get_complaint(ticket_id)
+    after_state = _complaint_to_dict(complaint) if complaint else None
     logger.info("admin.complaint_assigned", extra={"extra_data": {"ticket_id": ticket_id}})
-    return {"success": True, "complaint": _complaint_to_dict(complaint)}
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="ASSIGN_COMPLAINT",
+        resource=ticket_id,
+        before_state=before_state,
+        after_state=after_state
+    )
+    return {"success": True, "complaint": after_state}
 
 
 @app.post("/admin/complaints/{ticket_id}/priority")
@@ -1123,7 +1275,12 @@ def admin_update_complaint_priority(
     authorization: str | None = Header(default=None),
 ):
     """Update complaint priority and recompute its SLA deadline."""
-    _require_admin(authorization)
+    admin_id = _require_admin(authorization)
+    from backend.auth import auth_service
+    
+    before_c = storage_get_complaint(ticket_id)
+    before_state = _complaint_to_dict(before_c) if before_c else None
+    
     try:
         ok = storage_set_complaint_priority(ticket_id, body.priority)
     except ValueError as exc:
@@ -1133,11 +1290,20 @@ def admin_update_complaint_priority(
         raise HTTPException(status_code=404, detail="Complaint not found")
 
     complaint = storage_get_complaint(ticket_id)
+    after_state = _complaint_to_dict(complaint) if complaint else None
     logger.info(
         "admin.complaint_priority_updated",
         extra={"extra_data": {"ticket_id": ticket_id, "priority": body.priority}},
     )
-    return {"success": True, "complaint": _complaint_to_dict(complaint)}
+    
+    auth_service.log_admin_action(
+        admin_id=admin_id,
+        action="UPDATE_COMPLAINT_PRIORITY",
+        resource=ticket_id,
+        before_state=before_state,
+        after_state=after_state
+    )
+    return {"success": True, "complaint": after_state}
 
 
 @app.post("/admin/complaint/{ticket_id}/status")

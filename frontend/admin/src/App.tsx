@@ -426,14 +426,15 @@ export default function App() {
 
   return (
     <div>
-      <div className="navbar">
+      <a href="#main-content" className="sr-only focus:not-sr-only btn-skip">Skip to main content</a>
+      <div className="navbar" role="banner">
         <div className="navbar-content">
           <div className="navbar-branding">
             <div className="navbar-logo-icon">W</div>
             <div className="navbar-title">LGWSC CHATBOT</div>
           </div>
           
-          <nav className="navbar-nav">
+          <nav className="navbar-nav" aria-label="Admin Navigation">
             <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`} end>
               Dashboard
             </NavLink>
@@ -483,7 +484,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="container">
+      <main id="main-content" className="container" role="main">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/complaints" element={<Complaints />} />
@@ -494,7 +495,7 @@ export default function App() {
           <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
-      </div>
+      </main>
     </div>
   );
 }

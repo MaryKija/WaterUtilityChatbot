@@ -64,6 +64,22 @@ export default function Dashboard() {
     }
   };
 
+  // Keyboard Escape listener to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowStopModal(false);
+        setActiveTakeoverItem(null);
+      }
+    };
+    if (showStopModal || activeTakeoverItem) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showStopModal, activeTakeoverItem]);
+
   useEffect(() => {
     void loadData();
     // Poll every 5 seconds to keep the operations console updated with live counts
@@ -261,16 +277,16 @@ export default function Dashboard() {
           </div>
 
           <div style={{ overflowX: "auto" }}>
-            <table>
+            <table aria-label="Priority Escalations queue">
               <thead>
                 <tr>
-                  <th>TICKET ID</th>
-                  <th>PRIORITY</th>
-                  <th>SUBJECT / ISSUE</th>
-                  <th>LOCATION</th>
-                  <th>AI WAIT</th>
-                  <th style={{ width: 140 }}>PROGRESS</th>
-                  <th>ACTION</th>
+                  <th scope="col">TICKET ID</th>
+                  <th scope="col">PRIORITY</th>
+                  <th scope="col">SUBJECT / ISSUE</th>
+                  <th scope="col">LOCATION</th>
+                  <th scope="col">AI WAIT</th>
+                  <th scope="col" style={{ width: 140 }}>PROGRESS</th>
+                  <th scope="col">ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -479,9 +495,15 @@ export default function Dashboard() {
 
       {/* Emergency STOP Confirmation Modal */}
       {showStopModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3 className="modal-title" style={{ color: "var(--color-danger)" }}>Confirm System Wide Stop</h3>
+        <div className="modal-overlay" onClick={() => setShowStopModal(false)}>
+          <div 
+            className="modal-content" 
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="stop-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="stop-modal-title" className="modal-title" style={{ color: "var(--color-danger)" }}>Confirm System Wide Stop</h3>
             <div className="modal-body">
               <p style={{ marginBottom: 12 }}>
                 <strong>WARNING:</strong> Triggering a System Wide Stop immediately halts the autonomous response loop of the LGWSC WhatsApp chatbot.
@@ -510,9 +532,15 @@ export default function Dashboard() {
 
       {/* Operator Takeover Modal */}
       {activeTakeoverItem && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h3 className="modal-title">
+        <div className="modal-overlay" onClick={() => setActiveTakeoverItem(null)}>
+          <div 
+            className="modal-content" 
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="takeover-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="takeover-modal-title" className="modal-title">
               Confirm Safety {activeTakeoverItem.action}
             </h3>
             <div className="modal-body">

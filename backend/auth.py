@@ -596,6 +596,40 @@ class AuthService:
             extra={"extra_data": details}
         )
 
+    def log_admin_action(self, admin_id: str, action: str, resource: str, before_state: Any, after_state: Any, ip_address: Optional[str] = None, user_agent: Optional[str] = None) -> None:
+        """Log an administrative action with detailed before/after states."""
+        log_id = f"AUD_{secrets.token_hex(12)}"
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        details = {
+            "before": before_state,
+            "after": after_state
+        }
+        
+        with _connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO audit_logs (log_id, user_id, action, resource, timestamp, ip_address, user_agent, success, details)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    log_id,
+                    admin_id,
+                    action,
+                    resource,
+                    timestamp,
+                    ip_address,
+                    user_agent,
+                    True,
+                    json.dumps(details)
+                )
+            )
+        
+        logger.info(
+            f"audit.{action}",
+            extra={"extra_data": {"admin_id": admin_id, "resource": resource, "details": details}}
+        )
+
 
 class PIIProtection:
     """PII protection for public endpoints."""

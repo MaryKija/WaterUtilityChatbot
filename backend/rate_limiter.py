@@ -84,7 +84,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
       - Admin & Auth APIs (/admin/*, /auth/*): 10 requests/minute (configurable)
     """
 
-    def __init__(self, app, chat_limiter: InMemoryRateLimiter = None, admin_limiter: InMemoryRateLimiter = None):
+    def __init__(self, app, chat_limiter: InMemoryRateLimiter | None = None, admin_limiter: InMemoryRateLimiter | None = None):
         super().__init__(app)
         
         # We can dynamically load limits or use defaults
