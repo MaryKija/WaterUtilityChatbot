@@ -28,9 +28,10 @@ class InMemoryRateLimiter:
     For multi-worker deployments, swap the dict for a Redis backend.
     """
 
-    def __init__(self, max_requests: int = 20, window_seconds: int = 60):
+    def __init__(self, max_requests: int = 20, window_seconds: int = 60, action_name: str = "messages"):
         self.max_requests = max_requests
         self.window = window_seconds
+        self.action_name = action_name
         self._buckets: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
 
@@ -49,8 +50,8 @@ class InMemoryRateLimiter:
                 raise HTTPException(
                     status_code=429,
                     detail=(
-                        f"Too many requests. You may send up to {self.max_requests} "
-                        f"messages per {self.window} seconds. Please wait a moment."
+                        f"Too many requests. You may perform up to {self.max_requests} "
+                        f"{self.action_name} per {self.window} seconds. Please wait a moment."
                     ),
                 )
             self._buckets[key].append(now)
@@ -59,6 +60,100 @@ class InMemoryRateLimiter:
         """Clear the bucket for a key (useful in tests)."""
         with self._lock:
             self._buckets.pop(key, None)
+
+
+def get_client_ip(request: Request) -> str:
+    """Return the client IP address, handling proxies."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """FastAPI Middleware to automatically enforce per-IP rate limits.
+    
+    Tiers:
+      - Chat APIs (/chat, /feedback, etc.): 60 requests/minute (configurable)
+      - Admin & Auth APIs (/admin/*, /auth/*): 10 requests/minute (configurable)
+    """
+
+    def __init__(self, app, chat_limiter: InMemoryRateLimiter = None, admin_limiter: InMemoryRateLimiter = None):
+        super().__init__(app)
+        
+        # We can dynamically load limits or use defaults
+        chat_req = int(os.getenv("RATE_LIMIT_CHAT_REQUESTS", "60"))
+        chat_window = int(os.getenv("RATE_LIMIT_CHAT_WINDOW", "60"))
+        admin_req = int(os.getenv("RATE_LIMIT_ADMIN_REQUESTS", "10"))
+        admin_window = int(os.getenv("RATE_LIMIT_ADMIN_WINDOW", "60"))
+
+        self.chat_limiter = chat_limiter or InMemoryRateLimiter(
+            max_requests=chat_req, 
+            window_seconds=chat_window, 
+            action_name="requests"
+        )
+        self.admin_limiter = admin_limiter or InMemoryRateLimiter(
+            max_requests=admin_req, 
+            window_seconds=admin_window, 
+            action_name="admin actions"
+        )
+        
+        self.enabled = os.getenv("RATE_LIMIT_ENABLED", "True").lower() == "true"
+
+    async def dispatch(self, request: Request, call_next):
+        if not self.enabled:
+            return await call_next(request)
+
+        path = request.url.path
+
+        # 1. Skip static assets, Vite dev server files, and non-API files
+        if (
+            path.startswith("/assets") or 
+            path.startswith("/static") or 
+            path.startswith("/admin/assets") or
+            any(path.endswith(ext) for ext in [".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".json", ".txt", ".woff", ".woff2", ".ttf", ".map"])
+        ):
+            return await call_next(request)
+
+        # 2. Skip WhatsApp webhook endpoint for per-IP middleware limiting
+        # Meta's webhook servers send multi-user traffic to /whatsapp/webhook.
+        # Specific user rate limiting is applied inside the webhook endpoint itself!
+        if path == "/whatsapp/webhook":
+            return await call_next(request)
+
+        # 3. Determine tier & apply rate limit by IP
+        client_ip = get_client_ip(request)
+        
+        try:
+            if path.startswith("/admin/") or path.startswith("/auth/"):
+                # Admin and auth endpoints: 10 requests / minute
+                key = f"admin:{client_ip}"
+                self.admin_limiter.check(key)
+            elif (
+                path == "/chat" or 
+                path == "/chat/clear" or 
+                path.startswith("/chat/updates") or 
+                path == "/feedback" or 
+                path.startswith("/feedback/") or
+                path == "/api/chat"
+            ):
+                # Chat actions: 60 requests / minute
+                key = f"chat:{client_ip}"
+                self.chat_limiter.check(key)
+        except HTTPException as exc:
+            # Return standard FastAPI JSON 429 Response
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail}
+            )
+
+        return await call_next(request)
 
 
 def _build_limiter() -> InMemoryRateLimiter:

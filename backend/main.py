@@ -137,6 +137,8 @@ _cors_allow_origins = [
     "http://127.0.0.1:5174",
 ]
 
+from .rate_limiter import RateLimitMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_allow_origins,
@@ -144,6 +146,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 @app.middleware("http")
 async def cookie_to_authorization_middleware(request: Request, call_next):

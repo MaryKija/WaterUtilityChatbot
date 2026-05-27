@@ -21,7 +21,7 @@ from backend.context_engine import context_manager, context_redact_pii
 from backend.config import config
 from backend.logger import logger
 from backend.auth import auth_service, AdminUser, Permission, UserRole, PIIProtection
-from backend.rate_limiter import rate_limiter, get_client_key
+from backend.rate_limiter import rate_limiter, get_client_key, RateLimitMiddleware
 from backend.validation import sanitize_input
 
 
@@ -113,6 +113,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 @app.middleware("http")
 async def cookie_to_authorization_middleware(request: Request, call_next):

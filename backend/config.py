@@ -53,6 +53,10 @@ class Config:
         )
         self.rate_limit_requests = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))
         self.rate_limit_window = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
+        self.rate_limit_chat_requests = int(os.getenv("RATE_LIMIT_CHAT_REQUESTS", "60"))
+        self.rate_limit_chat_window = int(os.getenv("RATE_LIMIT_CHAT_WINDOW", "60"))
+        self.rate_limit_admin_requests = int(os.getenv("RATE_LIMIT_ADMIN_REQUESTS", "10"))
+        self.rate_limit_admin_window = int(os.getenv("RATE_LIMIT_ADMIN_WINDOW", "60"))
 
         # CORS
         self.cors_origins = [
