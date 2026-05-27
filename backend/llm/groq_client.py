@@ -530,11 +530,28 @@ def generate_response(
     if not is_groq_reachable(timeout=3.0):
         raise RuntimeError("Groq unreachable (offline mode)")
 
+    # Dynamic Knowledge lookup via KnowledgeManager
+    retrieved_facts = ""
+    try:
+        from ..knowledge_manager import knowledge_manager
+        retrieved_facts = knowledge_manager.get_relevant_context(message)
+    except Exception as e:
+        logger.error(f"Error querying KnowledgeManager: {e}")
+
+    # Combine facts
+    combined_facts_list = []
+    if facts:
+        combined_facts_list.append(facts)
+    if retrieved_facts:
+        combined_facts_list.append(f"RELEVANT UTILITY KNOWLEDGE:\n{retrieved_facts}")
+    
+    combined_facts = "\n\n".join(combined_facts_list) if combined_facts_list else None
+
     intent_hint = f"Detected intent: {intent}." if intent else ""
     session_context = _conversation_context_block(session)
     session_section = f"Session context:\n{session_context}\n\n" if session_context else ""
     message_redacted = _sanitize_for_groq(message)
-    facts_block = f"\n\nFACTS (use only these facts when giving specific details):\n{_sanitize_for_groq(facts)}" if facts else ""
+    facts_block = f"\n\nFACTS (use only these facts when giving specific details):\n{_sanitize_for_groq(combined_facts)}" if combined_facts else ""
     extra = f"\n\nExtra instructions:\n{additional_instructions}" if additional_instructions else ""
 
     user_content = (

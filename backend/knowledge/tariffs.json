@@ -1,0 +1,30 @@
+[
+  {
+    "id": "tariff_domestic_metered",
+    "category": "tariffs",
+    "title": "LgWSC Domestic Metered Water Tariff Schedule",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Domestic Metered Tariff rates are based on the schedule for Central Province, Zambia. volumetric tiers: Tier 1 (Lifeline Block): 0 to 6 cubic meters (m³) per month costs ZMW 3.50 per cubic meter. Tier 2 (Standard Use): 6 to 15 cubic meters (m³) per month costs ZMW 8.20 per cubic meter. Tier 3 (Higher Use): 15 to 30 cubic meters (m³) per month costs ZMW 14.50 per cubic meter. Tier 4 (Heavy Use): greater than 30 cubic meters (m³) per month costs ZMW 22.00 per cubic meter. Fixed meter charge is ZMW 15.00 per month, and Sanitation Surcharge is 2.5% of the water subtotal charge.",
+    "keywords": ["tariff", "residential", "domestic", "metered", "price", "rate", "cost", "charge", "tier", "fixed charge", "billing"]
+  },
+  {
+    "id": "tariff_domestic_unmetered",
+    "category": "tariffs",
+    "title": "LgWSC Domestic Unmetered Water Flat Rates",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) domestic unmetered flat rates depend on the housing area density and cost: Low-cost housing areas flat rate is ZMW 85.00 per month. Medium-cost housing areas flat rate is ZMW 145.00 per month. High-cost housing areas flat rate is ZMW 220.00 per month.",
+    "keywords": ["tariff", "unmetered", "flat rate", "low cost", "medium cost", "high cost", "price", "residential", "charge"]
+  },
+  {
+    "id": "tariff_commercial",
+    "category": "tariffs",
+    "title": "LgWSC Commercial and Institutional Metered Tariff Schedule",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Commercial / Institutional Metered Tariff rates for businesses, industries, schools, and hospitals: Block 1: 0 to 10 cubic meters (m³) per month costs ZMW 12.00 per cubic meter. Block 2: 10 to 30 cubic meters (m³) per month costs ZMW 18.50 per cubic meter. Block 3: 30 to 60 cubic meters (m³) per month costs ZMW 26.00 per cubic meter. Block 4: greater than 60 cubic meters (m³) per month costs ZMW 35.00 per cubic meter. Fixed meter charge is ZMW 25.00 per month, and Sanitation Surcharge is 2.5% of the water subtotal charge.",
+    "keywords": ["tariff", "commercial", "industrial", "institutional", "school", "hospital", "business", "rate", "cost", "charge", "fixed charge"]
+  },
+  {
+    "id": "tariff_kiosk",
+    "category": "tariffs",
+    "title": "LgWSC Water Kiosks and Communal Standpipes Tariff",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Water Kiosks and Communal Standpipes use a subsidized flat rate of ZMW 0.50 per 20-litre container.",
+    "keywords": ["kiosk", "standpipe", "communal", "container", "20l", "litres", "subsidized", "price", "rate", "cost"]
+  }
+]

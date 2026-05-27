@@ -1,0 +1,58 @@
+[
+  {
+    "id": "office_kabwe",
+    "category": "offices",
+    "title": "LgWSC Kabwe Branch Head Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Kabwe Office. Address/Location: High Ridge Water Works, Kabwe, Central Province, Zambia. Phone: +260 215 221529. Email: kabwe@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (for payments and prepaid token purchases only); Sunday and Public Holidays: Closed. Emergency faults and burst pipes on-call team is available 24/7.",
+    "keywords": ["kabwe", "head office", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_kapiri",
+    "category": "offices",
+    "title": "LgWSC Kapiri Mposhi Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Kapiri Mposhi Office. Address/Location: Off Great North Road, Kapiri Mposhi, Central Province, Zambia. Phone: +260 215 271025. Email: kapiri@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["kapiri", "mposhi", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_mkushi",
+    "category": "offices",
+    "title": "LgWSC Mkushi Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Mkushi Office. Address/Location: Off Independence Avenue, Mkushi, Central Province, Zambia. Phone: +260 215 362291. Email: mkushi@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["mkushi", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_serenje",
+    "category": "offices",
+    "title": "LgWSC Serenje Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Serenje Office. Address/Location: Off Ng'answa Road, Serenje, Central Province, Zambia. Phone: +260 215 382065. Email: serenje@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["serenje", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_mumbwa",
+    "category": "offices",
+    "title": "LgWSC Mumbwa Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Mumbwa Office. Address/Location: Main Township Operational Hub, Mumbwa, Central Province, Zambia. Phone: +260 211 800385. Email: mumbwa@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["mumbwa", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_chibombo",
+    "category": "offices",
+    "title": "LgWSC Chibombo Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Chibombo Office. Address/Location: Main Boma District Area, Chibombo, Central Province, Zambia. Phone: +260 215 274125. Email: chibombo@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["chibombo", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "office_chisamba",
+    "category": "offices",
+    "title": "LgWSC Chisamba Branch Office",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) Chisamba Office. Address/Location: Main Township Area, Chisamba, Central Province, Zambia. Phone: +260 211 611010. Email: chisamba@lgwsc.co.zm. Operating Hours: Monday to Friday 08:00 - 17:00; Saturday 08:00 - 12:00 (payments and prepaid only); Sunday/Holidays: Closed. On-call emergency teams are available 24/7.",
+    "keywords": ["chisamba", "branch", "location", "address", "phone", "hours", "contact", "email"]
+  },
+  {
+    "id": "districts_served",
+    "category": "offices",
+    "title": "LgWSC Districts Served Directory",
+    "content": "Lukanga Water Supply and Sanitation Company (LgWSC) serves 12 districts in the Central Province of Zambia, which include: Kabwe, Kapiri Mposhi, Mkushi, Serenje, Mumbwa, Chibombo, Chisamba, Shibuyunji, Itezhi-Tezhi, Chitambo, Luano, and Ngabwe.",
+    "keywords": ["districts", "served", "coverage", "areas", "towns", "where", "kabwe", "kapiri", "mkushi", "serenje", "mumbwa", "chibombo", "chisamba"]
+  }
+]

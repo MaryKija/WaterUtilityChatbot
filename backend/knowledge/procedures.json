@@ -1,0 +1,44 @@
+[
+  {
+    "id": "proc_new_connection",
+    "category": "procedures",
+    "title": "LgWSC New Water Connection Application Process",
+    "content": "To apply for a new water connection with Lukanga Water Supply and Sanitation Company (LgWSC), you can use this chatbot or visit any service center. The requirements are: (1) Provide your full name, (2) Provide your physical address/location, (3) Provide your phone number and optional email address. Our CRM system will automatically record your request and issue a pending ticket. A technical survey team will contact you to inspect the site and provide a quotation for materials and installation. Once payment is made, the physical installation will be completed.",
+    "keywords": ["new connection", "connect", "install", "apply", "application", "requirements", "procedure", "steps", "crm"]
+  },
+  {
+    "id": "proc_billing_inquiry",
+    "category": "procedures",
+    "title": "LgWSC Billing and Account Balance Inquiries",
+    "content": "To check your LgWSC account balance and latest bill details: (1) Provide your 6-digit numeric account number (e.g. 000001). (2) Enter your 4-digit security PIN when prompted. Your account is secured by a PIN gate. Standard demo accounts have preset PINs (e.g. 000001 uses 1234). If you enter the incorrect PIN 3 times, your account is temporarily locked for security. After verification, the bot retrieves your consumption, tier charges, fixed fees, and total outstanding balance from the database, and displays them alongside mobile payment channels.",
+    "keywords": ["bill", "balance", "check balance", "account number", "pin", "verify", "gate", "incorrect", "locked"]
+  },
+  {
+    "id": "proc_payment_methods",
+    "category": "procedures",
+    "title": "LgWSC Accepted Payment Channels",
+    "content": "Accepted payment methods for LgWSC include: (1) Mobile Money: MTN Mobile Money (dial *303# -> Payments -> LgWSC), Airtel Money (dial *778# -> Pay Bill -> LgWSC), or Zamtel Kwacha (dial *422# -> Pay Bill -> LgWSC). (2) Bank Transfer: Zambia National Commercial Bank (ZANACO) Kabwe Main Branch, Account No: 5490012345678, Account Name: Lukanga Water Supply & Sanitation Co. (3) Over the counter: Cash or card at any branch office (e.g. Kabwe Head Office on Independence Avenue, open Mon-Fri 08:00-17:00, Sat 09:00-13:00). Always use your 6-digit Account Number as the payment reference.",
+    "keywords": ["pay", "payment", "mobile money", "mtn", "airtel", "zamtel", "zanaco", "bank", "transfer", "cash", "office", "reference"]
+  },
+  {
+    "id": "proc_payment_reflection",
+    "category": "procedures",
+    "title": "Handling Payments Not Reflected",
+    "content": "If you paid your LgWSC bill but the payment is not reflected in your balance: (1) Let the bot know. (2) Provide your 6-digit Account Number, the Payment Method used, the approximate payment date, and the amount paid. (3) The bot will generate an escalation ticket (e.g. WC-XXXXXX), mark your case as WAITING, and hand it over to a human customer service representative who will manually verify the payment transaction and update your account.",
+    "keywords": ["not reflected", "payment missing", "still unpaid", "paid", "reconcile", "escalate", "agent", "human"]
+  },
+  {
+    "id": "proc_report_fault",
+    "category": "procedures",
+    "title": "Reporting Outages, Leaks, and Faults",
+    "content": "To report water supply outages, low pressure, pipe bursts, or water quality complaints: (1) Tell the bot you want to report a fault or leak. (2) Provide your Name, Area, and details of the Issue (e.g., pipe leak, muddy water). (3) The bot will record the complaint in our CRM, generate a reference number (e.g., WC-XXXXXX), and disclose the SLA turnaround time (e.g., 24 hours for leaks, 4 hours for urgent issues). It will also check for active outages in your area (such as Kabwe Central active maintenance) and show the estimated restoration time.",
+    "keywords": ["leak", "burst", "fault", "outage", "report", "dirty water", "low pressure", "complaint", "sla", "ticket", "kabwe central"]
+  },
+  {
+    "id": "proc_disputes",
+    "category": "procedures",
+    "title": "LgWSC Regulatory Disclosures and Billing Disputes",
+    "content": "LgWSC Billing Dispute Disclosure: 'If you wish to dispute this bill, please contact our customer service team within 15 days of the bill date. Your water supply will not be disconnected during the dispute resolution process, provided you pay the average of your previous three months' bills.' SLA turnaround times: Urgent (hospital/school/contamination) takes 4 hours, High priority (leaks/quality) takes 24 hours, Normal (no water/meter) takes 48 hours, Low priority takes 72 hours.",
+    "keywords": ["dispute", "complaint", "disconnect", "water supply", "regulatory", "sla", "urgency", "priority", "hours"]
+  }
+]
