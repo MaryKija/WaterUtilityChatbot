@@ -127,7 +127,7 @@ def test_general_agent_handle_clears_stale_state(monkeypatch):
     context["entities"] = {"account_number": "123456"}
 
     async def run() -> None:
-        out = await GeneralAgent().handle("hello", context)
+        out = await GeneralAgent().handle("test", context)
         assert out["reply"] == "Stub reply"
         assert context["active_agent"] is None
         assert context["intent"] is None

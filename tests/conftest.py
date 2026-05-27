@@ -84,6 +84,7 @@ def isolated_sqlite_db(monkeypatch):
     from backend.customer_auth import customer_auth_service
 
     monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "False")
 
     db_dir = Path(__file__).resolve().parents[1] / ".test_dbs"
     db_dir.mkdir(exist_ok=True)
