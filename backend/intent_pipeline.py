@@ -99,6 +99,32 @@ class IntentPipeline:
                 r"\b(mobile|money|bank|transfer|cash|office)\b.*\b(payment|pay)\b",
             ],
         }
+        self.active_candidates = []
+        self.load_active_candidates()
+
+    def load_active_candidates(self) -> None:
+        """Load active candidate intents from SQLite database."""
+        from .storage import DB_PATH, INTENT_CANDIDATES_TABLE
+        import sqlite3
+        self.active_candidates = []
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                rows = conn.execute(
+                    f"SELECT candidate_id, label, approvals_json FROM {INTENT_CANDIDATES_TABLE} WHERE active = 1"
+                ).fetchall()
+                for r in rows:
+                    self.active_candidates.append({
+                        "candidate_id": r[0],
+                        "label": r[1],
+                        "approvals": r[2]
+                    })
+            logger.info(f"Loaded {len(self.active_candidates)} active candidate intents into pipeline cache.")
+        except Exception as e:
+            logger.warning(f"Failed to load active candidate intents: {e}")
+
+    def reload_cache(self) -> None:
+        """Reload the in-memory active candidate intents cache."""
+        self.load_active_candidates()
 
     def _billing_inquiry_priority(self, message_lower: str) -> bool:
         """Strong billing phrases that must not be misrouted to fault/complaint flows."""
@@ -174,6 +200,19 @@ class IntentPipeline:
                 "entities": {},
                 "source": "rule_general_priority",
             }
+
+        # Check against dynamically active candidate intents
+        for cand in self.active_candidates:
+            label = cand["label"]
+            clean_label = label.lower().replace("_candidate", "").replace("_", " ")
+            # Match if label words occur in query
+            if clean_label in message_lower or any(word in message_lower for word in clean_label.split() if len(word) > 3):
+                return {
+                    "intent": label,
+                    "confidence": 0.92,
+                    "entities": self._extract_entities(message, context),
+                    "source": "dynamic_active_candidate"
+                }
 
         # Hard priority: outage information requests must not route to complaint intake
         # e.g. "I want an update about a water outage" → report_fault (outage lookup)

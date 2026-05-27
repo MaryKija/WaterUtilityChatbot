@@ -559,7 +559,7 @@ def generate_response(
         "Reply as the assistant."
     ).strip()
 
-    return _post_chat_completions_text(
+    raw_response = _post_chat_completions_text(
         messages=[
             {"role": "system", "content": WATER_UTILITY_RESPONSE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -567,6 +567,9 @@ def generate_response(
         max_tokens=max_tokens,
         temperature=0.4,
     )
+
+    from ..security import validate_output
+    return validate_output(raw_response)
 
 
 def detect_human_request(message: str, session: dict) -> Dict[str, Any]:

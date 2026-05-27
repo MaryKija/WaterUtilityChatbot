@@ -247,8 +247,26 @@ async def chat(data: ChatRequest, request: Request):
     client_key = get_client_key(request, phone)
     rate_limiter.check(client_key)
 
-    # 2. Sanitize input — strip null bytes, control chars, excessive whitespace
-    message = sanitize_input(data.message or "")
+    # 2. Sanitize input — strip null bytes, control chars, excessive whitespace, jailbreak patterns, and blocked URLs
+    from backend.security import sanitize_input as secure_sanitize, SecurityViolation
+    try:
+        message = secure_sanitize(data.message or "")
+    except SecurityViolation as exc:
+        logger.warning(f"Security violation blocked: {exc}")
+        return {
+            "response": str(exc),
+            "intent": "out_of_scope",
+            "confidence": 1.0,
+            "entities": {},
+            "tier": "high",
+            "escalated": False,
+            "auto_escalated": False,
+            "escalation_reason": "security_violation",
+            "active_agent": "general_agent",
+            "tool_used": None,
+            "tool_reason": None,
+            "tool_trace": [],
+        }
     if not message:
         return {
             "response": "Please send a message and I'll be happy to help.",
@@ -1550,7 +1568,14 @@ async def whatsapp_incoming(payload: dict, request: Request):
         rate_limiter.check(f"wa:{from_number}")
 
         # Sanitize and enforce length
-        text = sanitize_input(text)[:1000]
+        from backend.security import sanitize_input as secure_sanitize, SecurityViolation
+        try:
+            text = secure_sanitize(text)[:1000]
+        except SecurityViolation as exc:
+            logger.warning(f"WhatsApp webhook security violation blocked: {exc}")
+            if WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID:
+                _send_whatsapp_reply(from_number, str(exc))
+            return {"status": "ok"}
 
         # Process through the same orchestrator as the web UI
         result = await orchestrator.process(message=text, user_id=f"wa:{from_number}")
@@ -1621,6 +1646,57 @@ def _send_whatsapp_reply(to: str, text: str) -> None:
             logger.warning(f"whatsapp.send_failed status={resp.status_code} body={resp.text[:200]}")
     except Exception as e:
         logger.error(f"whatsapp.send_error err={e}")
+
+# ---------------------------
+# Admin: Intent Cache Hot-Reloading
+# ---------------------------
+@app.post("/admin/intent_cache/invalidate")
+def admin_invalidate_intent_cache(authorization: str | None = Header(default=None)):
+    """Manually invalidates the in-memory intent candidate cache and reloads from DB."""
+    admin_id = _require_admin(authorization)
+    intent_engine.reload_cache()
+    logger.info(f"Intent cache manually invalidated by admin {admin_id}")
+    return {"success": True, "message": "Intent cache reloaded successfully"}
+
+
+async def poll_intent_db_task():
+    """Background task to poll the database for active intent candidate updates every 60 seconds."""
+    import sqlite3
+    import asyncio
+    from backend.storage import DB_PATH, INTENT_CANDIDATES_TABLE
+    
+    last_count = -1
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(f"SELECT COUNT(*) FROM {INTENT_CANDIDATES_TABLE} WHERE active = 1").fetchone()
+            if row:
+                last_count = row[0]
+    except Exception as e:
+        logger.warning(f"Error getting initial active intent count in polling task: {e}")
+        
+    while True:
+        try:
+            await asyncio.sleep(60)
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute(f"SELECT COUNT(*) FROM {INTENT_CANDIDATES_TABLE} WHERE active = 1").fetchone()
+                if row:
+                    current_count = row[0]
+                    if current_count != last_count:
+                        logger.info(f"Background intent polling: active candidates count changed from {last_count} to {current_count}. Reloading cache.")
+                        intent_engine.reload_cache()
+                        last_count = current_count
+        except asyncio.CancelledError:
+            logger.info("Background intent polling task cancelled")
+            break
+        except Exception as e:
+            logger.warning(f"Error in background intent polling task: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    import asyncio
+    asyncio.create_task(poll_intent_db_task())
+
 
 # ---------------------------
 # FRONTEND SERVING (CATCH-ALL)

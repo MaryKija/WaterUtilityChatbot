@@ -334,6 +334,21 @@ def chat(data: ChatRequest):
     phone = data.phone or data.user_id or "demo-user"
     message = data.message
 
+    # Enforce input sanitization to prevent prompt injection and URL forwarding
+    from .security import sanitize_input, SecurityViolation
+    try:
+        message = sanitize_input(message)
+    except SecurityViolation as exc:
+        return {
+            "reply": str(exc),
+            "intent": "out_of_scope",
+            "confidence": 1.0,
+            "entities": {},
+            "tier": "high",
+            "auto_escalated": False,
+            "active_agent": "general_agent",
+        }
+
     # Reset context if session has been cleared (e.g. by test runner)
     if phone not in sessions:
         from .context_engine import context_manager
@@ -1126,6 +1141,58 @@ def admin_intent_metrics(authorization: str | None = Header(default=None)):
             }
         )
     return out
+
+
+# ---------------------------
+# Admin: Intent Cache Hot-Reloading
+# ---------------------------
+@app.post("/admin/intent_cache/invalidate")
+def admin_invalidate_intent_cache(authorization: str | None = Header(default=None)):
+    """Manually invalidates the in-memory intent candidate cache and reloads from DB."""
+    admin_id = _require_admin(authorization)
+    from .intent_pipeline import intent_pipeline
+    intent_pipeline.reload_cache()
+    logger.info(f"Intent cache manually invalidated by admin {admin_id}")
+    return {"success": True, "message": "Intent cache reloaded successfully"}
+
+
+async def poll_intent_db_task():
+    """Background task to poll the database for active intent candidate updates every 60 seconds."""
+    import sqlite3
+    from .storage import DB_PATH, INTENT_CANDIDATES_TABLE
+    from .intent_pipeline import intent_pipeline
+    
+    last_count = -1
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(f"SELECT COUNT(*) FROM {INTENT_CANDIDATES_TABLE} WHERE active = 1").fetchone()
+            if row:
+                last_count = row[0]
+    except Exception as e:
+        logger.warning(f"Error getting initial active intent count in polling task: {e}")
+        
+    while True:
+        try:
+            await asyncio.sleep(60)
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute(f"SELECT COUNT(*) FROM {INTENT_CANDIDATES_TABLE} WHERE active = 1").fetchone()
+                if row:
+                    current_count = row[0]
+                    if current_count != last_count:
+                        logger.info(f"Background intent polling: active candidates count changed from {last_count} to {current_count}. Reloading cache.")
+                        intent_pipeline.reload_cache()
+                        last_count = current_count
+        except asyncio.CancelledError:
+            logger.info("Background intent polling task cancelled")
+            break
+        except Exception as e:
+            logger.warning(f"Error in background intent polling task: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(poll_intent_db_task())
+
 
 # ---------------------------
 # Health Endpoint
