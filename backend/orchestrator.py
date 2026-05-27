@@ -582,6 +582,21 @@ class Orchestrator:
                 self.context_manager.save_context(user_id, context)
                 return self._format_response("Conversation reset. I'm an AI assistant for water utility services. How can I help you today?", context)
         
+            # 1.5 Check for operator takeover lock or pre-existing escalated state
+            if self.context_manager.is_operator_takeover_locked(user_id) or context.get("escalated"):
+                context["escalated"] = True
+                
+                # Direct route to human agent flow
+                from .agent import run_agent
+                reply_text = run_agent(message, {"intent": "escalation", "confidence": 1.0}, context)
+                
+                # Save updated context with turn history
+                context = self.context_manager.update_context_with_history(context, "user", message)
+                context = self.context_manager.update_context_with_history(context, "bot", reply_text)
+                self.context_manager.save_context(user_id, context)
+                
+                return self._format_response(reply_text, context, "escalation", 1.0)
+        
             # 2. Check for emergencies first
             emergency_alert = emergency_detector.detect_emergency(message, context)
             if emergency_alert:

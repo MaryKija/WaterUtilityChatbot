@@ -11,10 +11,215 @@ import shutil
 from typing import Any, Optional, Dict, List
 
 
+import os
+
+# -----------------------------------------------------------------------------
+# Transparent PostgreSQL Adapter for SQLite Compatibility
+# Allows seamless switching between SQLite and PostgreSQL at runtime
+# -----------------------------------------------------------------------------
+DATABASE_URL = os.getenv("DATABASE_URL")
+IS_POSTGRES = False
+if DATABASE_URL and (DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")):
+    IS_POSTGRES = True
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+def _translate_sql(sql: str, is_postgres: bool) -> str:
+    if not is_postgres:
+        return sql
+    
+    # 1. Translate parameter placeholders from ? to %s
+    translated = ""
+    in_single_quote = False
+    in_double_quote = False
+    i = 0
+    while i < len(sql):
+        char = sql[i]
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+        elif char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+        elif char == '?' and not in_single_quote and not in_double_quote:
+            translated += '%s'
+            i += 1
+            continue
+        translated += char
+        i += 1
+    sql = translated
+
+    # 2. Translate SQLite AUTOINCREMENT
+    sql = re.sub(
+        r'\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',
+        'SERIAL PRIMARY KEY',
+        sql,
+        flags=re.IGNORECASE
+    )
+
+    # 3. Translate SQLite INSERT OR IGNORE and INSERT OR REPLACE
+    if re.search(r'\bINSERT\s+OR\s+IGNORE\s+INTO\b', sql, re.IGNORECASE):
+        sql = re.sub(r'\bINSERT\s+OR\s+IGNORE\s+INTO\b', 'INSERT INTO', sql, flags=re.IGNORECASE)
+        sql = sql.rstrip()
+        if sql.endswith(';'):
+            sql = sql[:-1].rstrip() + ' ON CONFLICT DO NOTHING;'
+        else:
+            sql = sql + ' ON CONFLICT DO NOTHING'
+
+    if re.search(r'\bINSERT\s+OR\s+REPLACE\s+INTO\s+customer_auth\b', sql, re.IGNORECASE):
+        sql = re.sub(r'\bINSERT\s+OR\s+REPLACE\s+INTO\b', 'INSERT INTO', sql, flags=re.IGNORECASE)
+        sql = sql.rstrip()
+        if sql.endswith(';'):
+            sql = sql[:-1].rstrip()
+        sql += ' ON CONFLICT (account_number) DO UPDATE SET pin_salt = EXCLUDED.pin_salt, pin_hash = EXCLUDED.pin_hash, failed_attempts = EXCLUDED.failed_attempts, locked_until = EXCLUDED.locked_until;'
+
+    elif re.search(r'\bINSERT\s+OR\s+REPLACE\s+INTO\s+intent_candidates\b', sql, re.IGNORECASE):
+        sql = re.sub(r'\bINSERT\s+OR\s+REPLACE\s+INTO\b', 'INSERT INTO', sql, flags=re.IGNORECASE)
+        sql = sql.rstrip()
+        if sql.endswith(';'):
+            sql = sql[:-1].rstrip()
+        sql += ' ON CONFLICT (candidate_id) DO UPDATE SET source_suggestion_id = EXCLUDED.source_suggestion_id, label = EXCLUDED.label, handler = EXCLUDED.handler, active = EXCLUDED.active, approvals_json = EXCLUDED.approvals_json, updated_at = EXCLUDED.updated_at;'
+
+    # 4. Translate SQLite PRAGMA table_info
+    if 'PRAGMA table_info' in sql:
+        table_match = re.search(r'PRAGMA\s+table_info\(([^)]+)\)', sql, re.IGNORECASE)
+        if table_match:
+            table_name = table_match.group(1).strip().strip("'").strip('"')
+            sql = f"""
+                SELECT 
+                    0 as cid,
+                    column_name,
+                    data_type as type,
+                    case when is_nullable = 'NO' then 1 else 0 end as notnull,
+                    column_default as dflt_value,
+                    0 as pk
+                FROM information_schema.columns 
+                WHERE table_name = '{table_name}'
+            """
+
+    return sql
+
+class PostgresCursorWrapper:
+    def __init__(self, pg_cursor, is_postgres: bool):
+        self._cursor = pg_cursor
+        self._is_postgres = is_postgres
+
+    def execute(self, sql: str, params: Any = None):
+        translated_sql = _translate_sql(sql, self._is_postgres)
+        try:
+            if params is not None:
+                self._cursor.execute(translated_sql, params)
+            else:
+                self._cursor.execute(translated_sql)
+            return self
+        except Exception as e:
+            import psycopg2
+            if isinstance(e, (psycopg2.errors.UniqueViolation, psycopg2.errors.NotNullViolation, psycopg2.errors.ForeignKeyViolation)):
+                raise sqlite3.IntegrityError(str(e)) from e
+            elif isinstance(e, (psycopg2.errors.SyntaxError, psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn)):
+                raise sqlite3.OperationalError(str(e)) from e
+            raise
+
+    def executemany(self, sql: str, seq_of_parameters: Any):
+        translated_sql = _translate_sql(sql, self._is_postgres)
+        try:
+            self._cursor.executemany(translated_sql, seq_of_parameters)
+            return self
+        except Exception as e:
+            import psycopg2
+            if isinstance(e, (psycopg2.errors.UniqueViolation, psycopg2.errors.NotNullViolation)):
+                raise sqlite3.IntegrityError(str(e)) from e
+            raise
+
+    def fetchone(self):
+        try:
+            return self._cursor.fetchone()
+        except Exception as e:
+            if "no results to fetch" in str(e).lower():
+                return None
+            raise
+
+    def fetchall(self):
+        try:
+            return self._cursor.fetchall()
+        except Exception as e:
+            if "no results to fetch" in str(e).lower():
+                return []
+            raise
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    def close(self):
+        self._cursor.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+class PostgresConnectionWrapper:
+    def __init__(self, pg_conn, is_postgres: bool):
+        self._conn = pg_conn
+        self._is_postgres = is_postgres
+
+    def cursor(self):
+        return PostgresCursorWrapper(self._conn.cursor(), self._is_postgres)
+
+    def execute(self, sql: str, params: Any = None):
+        cursor = self.cursor()
+        cursor.execute(sql, params)
+        return cursor
+
+    def executemany(self, sql: str, seq_of_parameters: Any):
+        cursor = self.cursor()
+        cursor.executemany(sql, seq_of_parameters)
+        return cursor
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
+
+_original_connect = sqlite3.connect
+
+def custom_connect(database, *args, **kwargs):
+    if IS_POSTGRES:
+        import psycopg2
+        pg_conn = psycopg2.connect(DATABASE_URL)
+        return PostgresConnectionWrapper(pg_conn, is_postgres=True)
+    return _original_connect(database, *args, **kwargs)
+
+sqlite3.connect = custom_connect
+
 # HARD REQUIREMENT: Persist in SQLite `water_utility.db`.
 # Back-compat: if an older `database.db` exists and the new DB doesn't,
 # copy it over on first run so existing local data isn't lost.
-DB_PATH = Path(__file__).resolve().parents[1] / "water_utility.db"
+# Supports DATABASE_PATH env var for production environments like Render.
+_db_env = os.getenv("DATABASE_PATH")
+if _db_env:
+    DB_PATH = Path(_db_env)
+else:
+    DB_PATH = Path(__file__).resolve().parents[1] / "water_utility.db"
+
 _LEGACY_DB_PATH = Path(__file__).resolve().parents[1] / "database.db"
 
 COMPLAINTS_TABLE = "water_complaints"
@@ -60,7 +265,12 @@ ALLOWED_COMPLAINT_CATEGORIES = {
 ALLOWED_COMPLAINT_PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
 
 
-def _connect() -> sqlite3.Connection:
+def _connect() -> Any:
+    if IS_POSTGRES:
+        if DATABASE_URL is None:
+            raise ValueError("DATABASE_URL is not set but IS_POSTGRES is True")
+        return sqlite3.connect(DATABASE_URL)
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     # Legacy DB migration (best-effort copy). SQLite doesn't support cross-file migration

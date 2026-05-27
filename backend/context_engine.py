@@ -28,6 +28,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Literal, Optional, Tuple
 
 import requests
+import redis
+
+# -----------------------------------------------------------------------------
+# Optional Redis State & Handoff Lock Engine
+# -----------------------------------------------------------------------------
+REDIS_URL = os.getenv("REDIS_URL")
+redis_client = None
+if REDIS_URL:
+    try:
+        # Standard redis connection pool
+        redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        # Test connection
+        redis_client.ping()
+        logger.info(f"Redis context backend configured successfully at URL: {REDIS_URL}")
+    except Exception as e:
+        logger.warning(f"Failed to connect to Redis at {REDIS_URL}, falling back to database storage. Error: {e}")
+        redis_client = None
 
 from .config import config
 from .logger import logger
@@ -146,7 +163,24 @@ class ContextManager:
         return context
 
     def load_context(self, user_id: str) -> dict:
-        """Load persisted context from database."""
+        """Load persisted context from database (with Redis write-through cache fallback)."""
+        uid = (user_id or "").strip() or "unknown"
+        
+        # 1. Try Redis cache first
+        if redis_client:
+            try:
+                cached = redis_client.get(f"session:{uid}")
+                if cached:
+                    ctx = json.loads(cached)
+                    if isinstance(ctx, dict):
+                        # Ensure all schema fields exist
+                        context = self._new_context_shell()
+                        context.update(ctx)
+                        return context
+            except Exception as e:
+                logger.warning(f"Redis cache read failed for user {uid}: {e}")
+
+        # 2. Fall back to database
         from .storage import get_session_context
         ctx = get_session_context(user_id)
         if not isinstance(ctx, dict):
@@ -155,13 +189,33 @@ class ContextManager:
         # Ensure all required fields exist
         context = self._new_context_shell()
         context.update(ctx)
+        
+        # 3. Populate Redis cache
+        if redis_client:
+            try:
+                ttl_seconds = max(1, FLOW_TIMEOUT_HOURS) * 3600
+                redis_client.set(f"session:{uid}", json.dumps(context), ex=ttl_seconds)
+            except Exception as e:
+                logger.warning(f"Redis cache write failed for user {uid}: {e}")
+                
         return context
 
     def save_context(self, user_id: str, context: dict) -> None:
-        """Persist context to database."""
-        from .storage import upsert_session_context
+        """Persist context to database and sync to Redis cache."""
+        uid = (user_id or "").strip() or "unknown"
         context["last_updated"] = _utc_now_iso()
+        
+        # 1. Write to database (permanent archive)
+        from .storage import upsert_session_context
         upsert_session_context(user_id, context)
+        
+        # 2. Write to Redis cache
+        if redis_client:
+            try:
+                ttl_seconds = max(1, FLOW_TIMEOUT_HOURS) * 3600
+                redis_client.set(f"session:{uid}", json.dumps(context), ex=ttl_seconds)
+            except Exception as e:
+                logger.warning(f"Redis cache write failed for user {uid}: {e}")
 
     def should_classify_intent(self, context: dict) -> bool:
         """Decide whether to run intent classification."""
@@ -275,6 +329,36 @@ class ContextManager:
         context.clear()
         context.update(fresh_context)
         return context
+
+    def is_operator_takeover_locked(self, user_id: str) -> bool:
+        """Check if an active operator takeover lock exists in Redis."""
+        if not redis_client:
+            return False
+        try:
+            return bool(redis_client.get(f"lock:takeover:{user_id}"))
+        except Exception as e:
+            logger.warning(f"Redis lock check failed: {e}")
+            return False
+
+    def acquire_operator_takeover_lock(self, user_id: str, duration_hours: int = 2) -> None:
+        """Acquire a temporary operator takeover lock in Redis."""
+        if not redis_client:
+            return
+        try:
+            redis_client.set(f"lock:takeover:{user_id}", "true", ex=duration_hours * 3600)
+            logger.info(f"Acquired operator takeover lock for user {user_id} for {duration_hours} hours.")
+        except Exception as e:
+            logger.warning(f"Failed to set operator takeover lock: {e}")
+
+    def release_operator_takeover_lock(self, user_id: str) -> None:
+        """Release the operator takeover lock in Redis."""
+        if not redis_client:
+            return
+        try:
+            redis_client.delete(f"lock:takeover:{user_id}")
+            logger.info(f"Released operator takeover lock for user {user_id}.")
+        except Exception as e:
+            logger.warning(f"Failed to release operator takeover lock: {e}")
 
     def _map_intent_to_agent(self, intent: str) -> str:
         """Map intent to appropriate agent."""

@@ -367,16 +367,32 @@ def admin_reply_escalation(escalation_id: str, body: EscalationReplyCreate):
         raise HTTPException(status_code=404, detail="Escalation not found")
 
     e = storage_get_escalation(escalation_id)
+    if e:
+        try:
+            from .context_engine import context_manager
+            context_manager.acquire_operator_takeover_lock(e.user_id)
+        except Exception as exc:
+            logger.warning(f"Failed to acquire operator takeover lock for user {e.user_id}: {exc}")
+            
     return {"success": True, "escalation": asdict(e) if e else None}
 
 
 @app.post("/admin/escalations/{escalation_id}/close")
 def admin_close_escalation(escalation_id: str):
+    e = storage_get_escalation(escalation_id)
     ok = storage_close_escalation(escalation_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Escalation not found")
-    e = storage_get_escalation(escalation_id)
-    return {"success": True, "escalation": asdict(e) if e else None}
+        
+    if e:
+        try:
+            from .context_engine import context_manager
+            context_manager.release_operator_takeover_lock(e.user_id)
+        except Exception as exc:
+            logger.warning(f"Failed to release operator takeover lock for user {e.user_id}: {exc}")
+            
+    e_updated = storage_get_escalation(escalation_id)
+    return {"success": True, "escalation": asdict(e_updated) if e_updated else None}
 
 
 # ---------------------------
