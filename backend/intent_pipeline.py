@@ -40,8 +40,6 @@ class ClassificationResult:
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now().isoformat()
-        if self.ensemble_votes is None:
-            self.ensemble_votes = {}
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""

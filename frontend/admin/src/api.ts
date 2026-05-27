@@ -1,12 +1,17 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("admin_token");
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers,
   });
 
   if (!res.ok) {
@@ -93,5 +98,14 @@ export const api = {
       `/admin/escalations/${encodeURIComponent(escalationId)}/close`,
       { method: "POST" },
     ),
+  login: (username: string, password: string) =>
+    http<{ success: boolean; token?: string; user_id?: string; role?: string; message?: string }>(
+      "/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      }
+    ),
+  getDashboardMetrics: () => http<any>("/admin/dashboard"),
 };
 

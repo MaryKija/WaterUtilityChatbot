@@ -87,6 +87,44 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
           dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
         />
 
+        {message.attachment && message.attachment.type === "statement_card" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.3 }}
+            className="mt-3 w-full max-w-sm rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 p-4 shadow-inner"
+          >
+            <div className="flex items-center justify-between border-b border-border/30 pb-2 mb-3">
+              <div>
+                <span className="text-[10px] font-bold text-primary/80 uppercase tracking-wider">Statement ID</span>
+                <div className="text-xs font-semibold font-mono text-foreground">{message.attachment.id}</div>
+              </div>
+              <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-[9px] font-bold text-primary uppercase">
+                {message.attachment.label}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">Amount Due</span>
+                <div className="text-2xl font-extrabold text-foreground font-display">{message.attachment.amount}</div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase">Due Date</span>
+                <div className="text-xs font-bold text-foreground">{message.attachment.due_date}</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => alert(`Opening Statement details for ${message.attachment?.id}...`)}
+              className="w-full rounded-lg bg-primary py-2 text-center text-xs font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/95 active:scale-98"
+            >
+              {message.attachment.action}
+            </button>
+          </motion.div>
+        )}
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

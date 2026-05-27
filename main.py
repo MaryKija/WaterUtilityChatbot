@@ -117,15 +117,20 @@ app.add_middleware(
 # Mount static files for production
 PROJECT_ROOT = Path(__file__).resolve().parent
 frontend_path = PROJECT_ROOT / "frontend" / "aqua-chat-modern-main" / "dist"
+admin_frontend_path = PROJECT_ROOT / "frontend" / "admin" / "dist"
 
 # Ensure static directories exist so they can be unconditionally mounted safely
 # without raising Starlette's Directory nonexistent RuntimeError on startup.
 assets_path = frontend_path / "assets"
 assets_path.mkdir(parents=True, exist_ok=True)
 
+admin_assets_path = admin_frontend_path / "assets"
+admin_assets_path.mkdir(parents=True, exist_ok=True)
+
 # Mount Vite assets so resource requests like /assets/... are served with correct MIME types
 app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
 app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+app.mount("/admin/assets", StaticFiles(directory=str(admin_assets_path)), name="admin_assets")
 
 # Session memory (per phone number)
 sessions = {}  # Keep for backward compatibility, but not used in new implementation
@@ -1443,10 +1448,14 @@ async def serve_frontend(full_path: str):
 
     # Admin SPA
     # Check if it's an admin route
-    if full_path == "admin" or full_path == "admin/":
-        admin_path = PROJECT_ROOT / "static" / "admin.html"
-        if admin_path.exists():
-            return FileResponse(str(admin_path))
+    if full_path == "admin" or full_path == "admin/" or full_path.startswith("admin/"):
+        admin_index = PROJECT_ROOT / "frontend" / "admin" / "dist" / "index.html"
+        if admin_index.exists():
+            return FileResponse(str(admin_index))
+        # Fallback to static/admin.html for isolated dev fallback if React bundle not built
+        admin_legacy = PROJECT_ROOT / "static" / "admin.html"
+        if admin_legacy.exists():
+            return FileResponse(str(admin_legacy))
     
     # Feedback page
     if full_path == "feedback" or full_path == "feedback/":

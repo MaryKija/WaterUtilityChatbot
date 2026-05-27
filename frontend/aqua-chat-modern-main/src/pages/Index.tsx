@@ -10,12 +10,48 @@ import { sendMessage, getChatUpdates, clearChat, getSessionUserId } from "@/serv
 import { Droplets, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const getMockDate = (hours: number, minutes: number) => {
+  const d = new Date();
+  d.setHours(hours, minutes, 0, 0);
+  return d;
+};
+
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
-  text: "Hello! I'm the LgWSC Customer Service Assistant for Lukanga Water Supply and Sanitation Company. I can help you with billing inquiries, water quality reports, fault reporting, outage updates, and more. How can I help you today?",
+  text: "Hello! I'm your LgWSC assistant. How can I help with your utility services today?",
   sender: "bot",
-  timestamp: new Date(),
+  timestamp: getMockDate(9, 41),
 };
+
+const MOCK_MESSAGES: ChatMessage[] = [
+  WELCOME_MESSAGE,
+  {
+    id: "mock-2",
+    text: "I have a question about my recent water bill",
+    sender: "user",
+    timestamp: getMockDate(9, 42),
+  },
+  {
+    id: "mock-3",
+    text: "I've found your latest statement. It looks like your usage increased by 12% compared to last month. You can view the full breakdown below:",
+    sender: "bot",
+    timestamp: getMockDate(9, 42),
+    attachment: {
+      type: "statement_card",
+      id: "#W-99283",
+      amount: "$142.50",
+      label: "Water Usage - Oct 2023",
+      due_date: "Nov 15, 2023",
+      action: "View Details",
+    },
+  },
+  {
+    id: "mock-4",
+    text: "Would you like to report a potential leak or set up a payment plan?",
+    sender: "bot",
+    timestamp: getMockDate(9, 42),
+  },
+];
 
 type ChatResponse = {
   response: string;
@@ -40,7 +76,7 @@ const suggestedFollowUps = [
 
 const Index = () => {
   const [userId] = useState(() => getSessionUserId());
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [isTyping, setIsTyping] = useState(false);
   const [intent, setIntent] = useState("-");
   const [confidence, setConfidence] = useState("");
@@ -182,7 +218,7 @@ const Index = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[hsl(185,60%,25%)] via-[hsl(200,50%,30%)] to-[hsl(220,40%,20%)] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[hsl(185,60%,25%)] via-[hsl(200,50%,30%)] to-[hsl(220,40%,20%)] p-4 sm:p-6">
       {/* Decorative background orbs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-[hsl(var(--chat-glow))] opacity-[0.07] blur-3xl" />
@@ -192,7 +228,7 @@ const Index = () => {
       {/* Admin shortcut (outside of chat components) */}
       <Link
         to="/admin"
-        className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/30"
+        className="fixed right-4 top-4 z-50 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/30 animate-pulse hover:animate-none"
       >
         Admin Panel
         <Shield className="h-3.5 w-3.5" />
@@ -202,12 +238,12 @@ const Index = () => {
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative flex h-[700px] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-card shadow-2xl shadow-black/20 ring-1 ring-white/10"
+        className="relative flex h-[800px] max-h-[90vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-card shadow-2xl shadow-black/20 ring-1 ring-white/10"
       >
         <ChatHeader intent={intent} confidence={confidence} onClear={handleClear} />
 
         {/* Messages area */}
-        <div className="chat-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto bg-chat-bg p-4">
+        <div className="chat-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto bg-chat-bg p-6">
           {isInitialChat && <WelcomeHero />}
           {messages.map((msg, i) => (
             <MessageBubble key={msg.id} message={msg} index={i} />
@@ -216,28 +252,34 @@ const Index = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {isInitialChat && (
-          <div className="border-t border-border/60 bg-card px-4 py-2.5">
-            <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-normal text-muted-foreground">
-              <Droplets className="h-3 w-3 text-primary" />
-              Quick actions
-            </div>
-            <div className="chat-scrollbar flex gap-2 overflow-x-auto pb-1">
-              {suggestedFollowUps.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => handleSend(item.query)}
-                  className="shrink-0 rounded-full border border-border bg-chat-input-bg px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+        {/* Persistent Quick Actions Grid */}
+        <div className="border-t border-border/60 bg-card px-6 py-3.5">
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <Droplets className="h-3 w-3 text-primary animate-pulse" />
+            Quick actions
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+            {suggestedFollowUps.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => handleSend(item.query)}
+                className="rounded-xl border border-border/60 bg-chat-input-bg px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-accent/50 hover:shadow active:scale-95 text-center overflow-hidden text-ellipsis whitespace-nowrap"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <ChatInput onSend={handleSend} disabled={isTyping} />
+
+        {/* Footer legal warning disclaimer */}
+        <div className="bg-card px-6 py-2 border-t border-border/40 text-center">
+          <p className="text-[10px] font-medium text-muted-foreground/80 tracking-wide m-0">
+            LgWSC assistant may provide automated information. Verify important billing details.
+          </p>
+        </div>
       </motion.div>
     </div>
   );

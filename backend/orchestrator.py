@@ -614,7 +614,7 @@ class Orchestrator:
         
             # Initialize intent and confidence turn-tracking variables
             intent = context.get("intent") or "general_chat"
-            confidence = context.get("confidence") or 0.0
+            confidence: float = float(context.get("confidence") or 0.0)
             failed = False
 
             # 4. Route to appropriate handler
@@ -668,7 +668,7 @@ class Orchestrator:
         reply = await self._handle_with_agent(agent, message, context)
         return reply, intent, confidence
     
-    async def _handle_new_intent(self, message: str, context: dict) -> str:
+    async def _handle_new_intent(self, message: str, context: dict) -> tuple[str, str, float]:
         """Handle new intent classification with agentic decision-making."""
         # Guard: if context already has a service agent set (stale load race),
         # treat this as a flow continuation rather than a new intent.
@@ -682,7 +682,8 @@ class Orchestrator:
         context["last_intent_result"] = intent_result
 
         if intent_result.get("intent") == "out_of_scope":
-            return await self._get_out_of_scope_response(message)
+            res = await self._get_out_of_scope_response(message)
+            return res, "out_of_scope", 1.0
 
         # Create decision context for agentic behavior
         user_id = context.get("user_id", "unknown")
@@ -806,7 +807,8 @@ class Orchestrator:
                 inferred_intent = self._infer_specific_intent(message)
                 if inferred_intent:
                     intent_result["intent"] = inferred_intent
-                    return await self._handle_new_intent(message, context)
+                    res_tuple = await self._handle_new_intent(message, context)
+                    return res_tuple[0]
                 else:
                     return await self._get_llm_fallback(message, context)
             
@@ -1108,7 +1110,8 @@ class Orchestrator:
                 context["intent"] = offline_intent
                 context["last_intent_result"] = offline_result
                 try:
-                    return await self._handle_new_intent(message, context)
+                    res_tuple = await self._handle_new_intent(message, context)
+                    return res_tuple[0]
                 except Exception as inner_exc:
                     logger.warning(f"Offline agent routing failed err={inner_exc}")
 

@@ -327,7 +327,7 @@ def get_payment_methods():
 
 def get_office_info(branch_or_area: str | None = None):
     """Get LgWSC branch details from the office directory."""
-    if not branch_or_area or str(branch_or_area).strip() == "" or str(branch_or_area).lower() == "none":
+    if not branch_or_area or branch_or_area.strip() == "" or branch_or_area.lower() == "none":
         branch_or_area = "Kabwe"
 
     office = storage_get_office(branch_or_area)
