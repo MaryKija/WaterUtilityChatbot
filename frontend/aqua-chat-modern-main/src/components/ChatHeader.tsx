@@ -1,6 +1,6 @@
 import { Droplets, Trash2, Moon, Sun, HelpCircle, User } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface ChatHeaderProps {
   intent: string;
@@ -9,9 +9,17 @@ interface ChatHeaderProps {
 }
 
 const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
   const isDebugMode = import.meta.env.DEV || window.location.search.includes('debug=true');
   const showConfidence = isDebugMode && confidence;
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
 
   return (
     <div className="relative overflow-hidden border-b border-border bg-card px-6 py-4 shadow-sm flex flex-col gap-3">
@@ -48,10 +56,7 @@ const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
 
           {/* Theme toggle */}
           <button
-            onClick={() => {
-              setIsDarkMode(!isDarkMode);
-              alert("Theme toggled! Seamless style synchronization completed.");
-            }}
+            onClick={() => setIsDarkMode(!isDarkMode)}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-chat-input-bg text-muted-foreground transition-all hover:bg-accent hover:text-foreground active:scale-95"
             title="Toggle theme"
           >
@@ -78,19 +83,19 @@ const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
         </div>
       </div>
 
-      {/* Debug panel (renders beautifully below on a second line to prevent header overflow) */}
+      {/* Debug panel (renders beautifully below on a second line to prevent header overflow, ultra compact size) */}
       {intent && intent !== "-" && (
         <motion.div
-          initial={{ opacity: 0, y: -5 }}
+          initial={{ opacity: 0, y: -3 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between rounded-xl border border-border/40 bg-accent/30 px-3.5 py-1.5 backdrop-blur-sm transition-all duration-300 hover:bg-accent/60 w-full"
+          className="flex items-center justify-between rounded-lg border border-border/30 bg-accent/20 px-2.5 py-1 backdrop-blur-sm transition-all duration-300 hover:bg-accent/40 w-full"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">AI Analysis:</span>
-            <span className="text-xs font-bold text-foreground font-mono bg-background/50 px-2 py-0.5 rounded-md border border-border/30">{intent.replace(/_/g, " ")}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">AI Analysis:</span>
+            <span className="text-[10px] font-semibold text-foreground font-mono bg-background/40 px-1.5 py-0.5 rounded border border-border/20">{intent.replace(/_/g, " ")}</span>
           </div>
           {confidence && (
-            <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full font-mono">
+            <span className="text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full font-mono">
               {confidence}
             </span>
           )}

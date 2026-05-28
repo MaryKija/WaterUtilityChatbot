@@ -271,20 +271,20 @@ const Index = () => {
           {isTyping && <TypingIndicator />}
         </div>
 
-        {/* Persistent Quick Actions Grid */}
-        <div className="border-t border-border/60 bg-card px-6 py-3.5" role="region" aria-label="Quick Actions">
+        {/* Persistent Quick Actions Horizontal Scroll */}
+        <div className="border-t border-border/60 bg-card px-6 py-3" role="region" aria-label="Quick Actions">
           <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             <Droplets className="h-3 w-3 text-primary animate-pulse" aria-hidden="true" />
             Quick actions
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/30 scroll-smooth -mx-6 px-6">
             {suggestedFollowUps.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => handleSend(item.query)}
                 aria-label={`Ask: ${item.label}`}
-                className="rounded-xl border border-border/60 bg-chat-input-bg px-2.5 py-2.5 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-accent/50 hover:shadow active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none text-center flex items-center justify-center min-h-[46px] w-full whitespace-normal break-words leading-tight"
+                className="flex-shrink-0 rounded-full border border-border/60 bg-chat-input-bg px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-accent/50 hover:shadow active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none whitespace-nowrap"
               >
                 {item.label}
               </button>
