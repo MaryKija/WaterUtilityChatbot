@@ -8,11 +8,17 @@
  * In development, calls go through the Vite proxy (no CORS issues).
  */
 
-// In production builds VITE_API_URL is set to the real backend URL.
+// In production builds VITE_API_URL is set to the real backend URL if remote.
+// If VITE_API_URL is localhost or missing, we use an empty string in production so same-origin relative paths are used.
 // In dev mode we use an empty string so the Vite proxy handles routing.
-const API_URL = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "")
-  : "";
+const API_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return "";
+})();
+
 
 /**
  * Returns a stable, per-browser-session user ID.

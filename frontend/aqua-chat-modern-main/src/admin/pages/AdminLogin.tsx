@@ -2,9 +2,14 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Droplets, ShieldCheck } from "lucide-react";
 
-const API_URL = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "")
-  : "";
+const API_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return "";
+})();
+
 
 export default function AdminLogin() {
   const [username, setUsername] = useState("");

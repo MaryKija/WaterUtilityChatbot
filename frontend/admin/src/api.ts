@@ -1,4 +1,11 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const API_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
+})();
+
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem("admin_token");

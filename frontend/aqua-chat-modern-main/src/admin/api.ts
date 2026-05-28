@@ -1,6 +1,11 @@
-const API_URL = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "")
-  : "";  // dev: use Vite proxy (no hardcoded port, no CORS issues)
+const API_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return ""; // dev/prod fallback: use relative path / Vite proxy
+})();
+
 
 function getAdminAuthHeader(): Record<string, string> {
   if (typeof window !== "undefined") {

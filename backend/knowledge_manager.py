@@ -63,6 +63,15 @@ class KnowledgeManager:
             logger.warning("No facts loaded. Skipping semantic search initialization.")
             return
 
+        # Bypasses importing sentence_transformers and loading the heavy PyTorch model
+        # in RAM-constrained environments like Render Free Tier (512MB limit)
+        low_memory = os.getenv("LOW_MEMORY", "false").lower() == "true" or os.getenv("DISABLE_SEMANTIC_SEARCH", "false").lower() == "true"
+        if low_memory:
+            logger.info("Low-memory mode active. Skipping SentenceTransformer/PyTorch semantic search initialization.")
+            self.model = None
+            self.embeddings = None
+            return
+
         try:
             from sentence_transformers import SentenceTransformer
             # Using the pre-installed high-quality lightweight model matching the intent discovery agent
