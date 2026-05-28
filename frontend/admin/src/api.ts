@@ -3,6 +3,10 @@ const API_URL = (() => {
   if (envUrl && !envUrl.includes("127.0.0.1") && !envUrl.includes("localhost")) {
     return envUrl.replace(/\/$/, "");
   }
+  // Fallback to live Render production backend if hosted on Vercel or in production
+  if (typeof window !== "undefined" && (window.location.hostname.includes("vercel.app") || !import.meta.env.DEV)) {
+    return "https://waterutilitychatbot.onrender.com";
+  }
   return import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
 })();
 
