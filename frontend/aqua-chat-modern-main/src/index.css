@@ -100,6 +100,17 @@
     --border: 215 19% 34%;
     --input: 215 19% 34%;
     --ring: 198 93% 59%;
+
+    /* Chat-specific dark mode tokens */
+    --chat-bg: 222 47% 7%;
+    --chat-user-bubble: 142 35% 15%;
+    --chat-bot-bubble: 217 32% 17%;
+    --chat-header-from: 185 82% 20%;
+    --chat-header-to: 170 55% 25%;
+    --chat-input-bg: 217 32% 12%;
+    --chat-shadow: 222 47% 4%;
+    --chat-glow: 190 100% 40%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 198 93% 59%;
