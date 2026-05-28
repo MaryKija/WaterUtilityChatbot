@@ -173,6 +173,7 @@ function formatMessage(text: string): string {
   return text
     .replace(/\*\*(.*?)\*\*/g, "$1")   // **bold** → plain
     .replace(/\*(.*?)\*/g, "$1")        // *italic* → plain
+    .replace(/_(.*?)_/g, "$1")          // _italic_ → plain
     .replace(/\n/g, "<br />");
 }
 

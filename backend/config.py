@@ -74,6 +74,11 @@ class Config:
             if origin not in self.cors_origins:
                 self.cors_origins.append(origin)
 
+        # Always allow Vercel deployment domain(s) to prevent CORS preflight failure
+        for origin in ("https://water-utility-chatbot-lac.vercel.app", "https://water-utility-chatbot.vercel.app"):
+            if origin not in self.cors_origins:
+                self.cors_origins.append(origin)
+
         self._validate()
 
     @property
