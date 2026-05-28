@@ -141,7 +141,8 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
           {isUser && <CheckCheck className="h-3 w-3 text-primary" aria-hidden="true" />}
         </motion.div>
 
-        {message.showSatisfactionRating && (
+        {/* Feedback rating block temporarily removed until issue has been sorted or delegated */}
+        {/* message.showSatisfactionRating && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -161,7 +162,7 @@ const MessageBubble = ({ message, index = 0 }: MessageBubbleProps) => {
               }}
             />
           </motion.div>
-        )}
+        ) */}
       </div>
     </motion.div>
   );
