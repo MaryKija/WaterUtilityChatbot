@@ -14,7 +14,7 @@ from backend.context_engine import ContextManager
 from backend.intent_pipeline import IntentPipeline
 from backend.tool_executor import ToolExecutor
 from backend.config import Config
-from backend.logger import get_logger
+from backend.logger import logger
 
 # Initialize FastAPI app
 app = FastAPI(title="Agentic WhatsApp Bot API")
@@ -30,13 +30,12 @@ app.add_middleware(
 
 # Initialize components
 config = Config()
-logger = get_logger(__name__)
 
 # Initialize core components
 context_manager = ContextManager()
 intent_pipeline = IntentPipeline()
 tool_executor = ToolExecutor()
-orchestrator = Orchestrator(context_manager, intent_pipeline, tool_executor)
+orchestrator = Orchestrator(config, context_manager, intent_pipeline, tool_executor)
 
 class ChatRequest(BaseModel):
     message: str
