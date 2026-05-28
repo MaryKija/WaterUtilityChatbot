@@ -217,6 +217,24 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [batterySaver, setBatterySaver] = useState<boolean>(
+    localStorage.getItem("battery_saver_mode") === "true"
+  );
+
+  useEffect(() => {
+    if (batterySaver) {
+      document.body.classList.add("theme-battery-saver");
+    } else {
+      document.body.classList.remove("theme-battery-saver");
+    }
+  }, [batterySaver]);
+
+  const toggleBatterySaver = () => {
+    const newVal = !batterySaver;
+    setBatterySaver(newVal);
+    localStorage.setItem("battery_saver_mode", String(newVal));
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -454,6 +472,31 @@ export default function App() {
             <NavLink to="/settings" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
               Settings
             </NavLink>
+            <span style={{ width: 1, height: 20, backgroundColor: "#334155", margin: "0 8px" }} />
+            <button
+              onClick={toggleBatterySaver}
+              className="nav-item"
+              title="Toggle OLED low-power high-contrast battery saver mode"
+              style={{
+                background: batterySaver ? "rgba(57, 255, 20, 0.15)" : "rgba(255, 255, 255, 0.05)",
+                border: "1px solid " + (batterySaver ? "#39ff14" : "rgba(255, 255, 255, 0.15)"),
+                cursor: "pointer",
+                color: batterySaver ? "#39ff14" : "var(--text-light)",
+                fontWeight: 600,
+                fontSize: 13,
+                padding: "8px 14px",
+                borderRadius: "var(--radius-sm)",
+                transition: "var(--transition-fast)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6
+              }}
+            >
+              <span className="material-icons" style={{ fontSize: 16 }}>
+                {batterySaver ? "battery_saver" : "battery_alert"}
+              </span>
+              <span>{batterySaver ? "OLED SAVER ON" : "OLED BATT SAVER"}</span>
+            </button>
             <span style={{ width: 1, height: 20, backgroundColor: "#334155", margin: "0 8px" }} />
             <button
               onClick={handleLogout}

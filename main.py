@@ -5,6 +5,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import json
 import os
+import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import asdict, dataclass
@@ -85,6 +87,37 @@ class IntentDeployRequest(BaseModel):
 class IntentActivateRequest(BaseModel):
     approved_by: Optional[str] = None
     role: Optional[str] = None  # "admin" bypasses 2-approval rule
+
+
+@dataclass
+class SLATracker:
+    uptime_start: str = datetime.now(timezone.utc).isoformat()
+    total_requests: int = 0
+    sla_latency_successes: int = 0  # < 3.0 seconds responses
+    error_count: int = 0
+    total_latency_seconds: float = 0.0
+
+    @property
+    def latency_sla_compliance_pct(self) -> float:
+        if self.total_requests == 0:
+            return 100.0
+        return (self.sla_latency_successes / self.total_requests) * 100.0
+
+    @property
+    def error_rate_pct(self) -> float:
+        if self.total_requests == 0:
+            return 0.0
+        return (self.error_count / self.total_requests) * 100.0
+
+    @property
+    def estimated_availability_pct(self) -> float:
+        if self.total_requests == 0:
+            return 99.9
+        # Server unhandled failures deduct from overall operational availability
+        unavailability = (self.error_count / self.total_requests) * 0.5
+        return max(0.0, min(100.0, 100.0 - unavailability))
+
+sla_tracker = SLATracker()
 
 
 # Log startup
@@ -288,10 +321,30 @@ async def chat(data: ChatRequest, request: Request):
     if len(message) > MAX_MSG_LEN:
         message = message[:MAX_MSG_LEN]
 
+    # Track metrics for SLA calculations
+    start_time = time.time()
+    sla_tracker.total_requests += 1
+
     try:
-        result = await orchestrator.process(message=message, user_id=phone)
-    except _requests.Timeout:
-        logger.warning(f"LLM timeout for user={phone}")
+        # Enforce strict Service Level Agreement latency target: < 3 seconds
+        result = await asyncio.wait_for(
+            orchestrator.process(message=message, user_id=phone),
+            timeout=3.0
+        )
+        
+        # Calculate latency and count latency SLA successes
+        latency = time.time() - start_time
+        sla_tracker.total_latency_seconds += latency
+        if latency < 3.0:
+            sla_tracker.sla_latency_successes += 1
+            
+    except asyncio.TimeoutError:
+        logger.warning(f"SLA Latency Violation: LLM timeout for user={phone} (>3.0s)")
+        sla_tracker.error_count += 1
+        
+        latency = time.time() - start_time
+        sla_tracker.total_latency_seconds += latency
+        
         return {
             "response": (
                 "I'm taking a little longer than usual to respond. "
@@ -303,7 +356,31 @@ async def chat(data: ChatRequest, request: Request):
             "tier": "high",
             "escalated": False,
             "auto_escalated": False,
-            "escalation_reason": None,
+            "escalation_reason": "sla_latency_timeout",
+            "active_agent": None,
+            "tool_used": None,
+            "tool_reason": None,
+            "tool_trace": [],
+        }
+    except _requests.Timeout:
+        logger.warning(f"LLM request timeout for user={phone}")
+        sla_tracker.error_count += 1
+        
+        latency = time.time() - start_time
+        sla_tracker.total_latency_seconds += latency
+        
+        return {
+            "response": (
+                "I'm taking a little longer than usual to respond. "
+                "Please try again in a moment."
+            ),
+            "intent": None,
+            "confidence": 0.0,
+            "entities": {},
+            "tier": "high",
+            "escalated": False,
+            "auto_escalated": False,
+            "escalation_reason": "network_timeout",
             "active_agent": None,
             "tool_used": None,
             "tool_reason": None,
@@ -311,6 +388,11 @@ async def chat(data: ChatRequest, request: Request):
         }
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}", exc_info=True)
+        sla_tracker.error_count += 1
+        
+        latency = time.time() - start_time
+        sla_tracker.total_latency_seconds += latency
+        
         return {
             "response": (
                 "I'm sorry, something went wrong on my end. "
@@ -322,7 +404,7 @@ async def chat(data: ChatRequest, request: Request):
             "tier": "high",
             "escalated": False,
             "auto_escalated": False,
-            "escalation_reason": None,
+            "escalation_reason": "system_error",
             "active_agent": None,
             "tool_used": None,
             "tool_reason": None,
@@ -1077,7 +1159,43 @@ def admin_dashboard(authorization: str | None = Header(default=None)):
     _require_admin(authorization)
     logger.info("admin.dashboard_accessed")
 
-    return get_dashboard_metrics()
+    metrics = get_dashboard_metrics()
+    metrics["sla"] = {
+        "latency_target_seconds": 3.0,
+        "latency_actual_avg_seconds": round(sla_tracker.total_latency_seconds / max(1, sla_tracker.total_requests), 3),
+        "latency_sla_compliance_pct": round(sla_tracker.latency_sla_compliance_pct, 2),
+        "availability_target_pct": 99.5,
+        "availability_actual_pct": round(sla_tracker.estimated_availability_pct, 2),
+        "error_rate_target_pct": 1.0,
+        "error_rate_actual_pct": round(sla_tracker.error_rate_pct, 2),
+        "total_requests": sla_tracker.total_requests,
+        "sla_violations": sla_tracker.error_count + (sla_tracker.total_requests - sla_tracker.sla_latency_successes),
+    }
+    return metrics
+
+
+@app.get("/admin/sla-metrics")
+def get_sla_metrics(authorization: str | None = Header(default=None)):
+    """Expose codified Service Level Agreement (SLA) status."""
+    _require_admin(authorization)
+    return {
+        "uptime_start": sla_tracker.uptime_start,
+        "latency": {
+            "target": "< 3 seconds",
+            "actual_avg_seconds": round(sla_tracker.total_latency_seconds / max(1, sla_tracker.total_requests), 3),
+            "sla_compliance_rate": f"{round(sla_tracker.latency_sla_compliance_pct, 2)}%"
+        },
+        "availability": {
+            "target": "99.5%",
+            "actual": f"{round(sla_tracker.estimated_availability_pct, 2)}%"
+        },
+        "error_rate": {
+            "target": "< 1%",
+            "actual": f"{round(sla_tracker.error_rate_pct, 2)}%"
+        },
+        "total_requests": sla_tracker.total_requests,
+        "sla_violations": sla_tracker.error_count
+    }
 
 
 class ResolutionRequest(BaseModel):
