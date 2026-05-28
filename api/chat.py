@@ -58,10 +58,9 @@ async def chat_endpoint(request: ChatRequest):
         logger.info(f"Received chat request: {request.message[:100]}...")
 
         # Process the message through the orchestrator
-        result = await orchestrator.process_request(
+        result = await orchestrator.process(
             message=request.message,
-            session_id=request.session_id,
-            user_id=request.user_id
+            user_id=request.user_id or request.session_id or "demo-user"
         )
 
         # Format response
