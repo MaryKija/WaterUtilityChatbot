@@ -1813,6 +1813,14 @@ async def poll_intent_db_task():
 @app.on_event("startup")
 async def startup_event():
     import asyncio
+    # Pre-initialize/upgrade database tables on startup (works for SQLite and PostgreSQL)
+    from backend.storage import init_db
+    try:
+        init_db()
+        logger.info("Database schema initialized successfully on startup.")
+    except Exception as db_err:
+        logger.error(f"Failed to initialize database schema on startup: {db_err}", exc_info=True)
+
     asyncio.create_task(poll_intent_db_task())
 
 
