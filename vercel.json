@@ -9,6 +9,13 @@
       }
     },
     {
+      "src": "frontend/admin/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
       "src": "api/chat.py",
       "use": "@vercel/python",
       "config": {
