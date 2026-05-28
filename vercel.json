@@ -29,12 +29,12 @@
       "dest": "/api/chat.py"
     },
     {
-      "src": "/admin/(.*)",
-      "dest": "/frontend/admin/dist/$1"
+      "src": "/admin(/.*)?",
+      "dest": "/frontend/admin$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/aqua-chat-modern-main/dist/$1"
+      "dest": "/frontend/aqua-chat-modern-main/$1"
     }
   ],
   "env": {
