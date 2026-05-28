@@ -87,7 +87,7 @@ const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
         >
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">AI Analysis:</span>
-            <span className="text-xs font-bold text-foreground font-mono bg-background/50 px-2 py-0.5 rounded-md border border-border/30">{intent}</span>
+            <span className="text-xs font-bold text-foreground font-mono bg-background/50 px-2 py-0.5 rounded-md border border-border/30">{intent.replace(/_/g, " ")}</span>
           </div>
           {confidence && (
             <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full font-mono">
