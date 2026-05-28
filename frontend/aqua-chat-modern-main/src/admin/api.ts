@@ -34,7 +34,7 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  // Token expired or revoked — clear storage and redirect to login
+  // Token expired or revoked - clear storage and redirect to login
   if (res.status === 401 || res.status === 403) {
     adminLogout();
     throw new Error(`Session expired. Please log in again.`);

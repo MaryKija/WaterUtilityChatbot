@@ -1,5 +1,5 @@
 /**
- * api.ts — Frontend API client
+ * api.ts - Frontend API client
  *
  * Uses a per-browser-session user ID so multiple demo visitors
  * don't share the same conversation context.

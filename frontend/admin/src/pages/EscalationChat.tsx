@@ -396,13 +396,13 @@ export default function EscalationChat() {
                 className="suggested-reply-btn"
                 onClick={() => handlePrefill("I can dispatch a field technician to investigate the line blockage at your property immediately.")}
               >
-                "I can dispatch..."
+                "I can dispatch a field technician to investigate the line blockage at your property immediately."
               </button>
               <button 
                 className="suggested-reply-btn"
                 onClick={() => handlePrefill("Let me check the status of the main pressure valve NW-8.")}
               >
-                "Check valve NW-8"
+                "Let me check the status of the main pressure valve NW-8."
               </button>
             </div>
 

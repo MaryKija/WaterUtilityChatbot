@@ -56,7 +56,7 @@ const ChatHeader = ({ intent, confidence, onClear }: ChatHeaderProps) => {
             className="flex items-center gap-1.5 rounded-xl border border-border bg-chat-input-bg px-3 py-2 text-xs font-bold text-foreground transition-all hover:bg-accent hover:border-primary/20 active:scale-95"
           >
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="hidden sm:inline">Clear</span>
+            <span className="inline">Clear</span>
           </button>
 
           {/* Theme toggle */}

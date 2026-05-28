@@ -38,7 +38,7 @@ const WelcomeHero = () => {
         Welcome to LgWSC Customer Service
       </motion.h2>
       <motion.p variants={itemVariants} className="mt-2 max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-        Lukanga Water Supply &amp; Sanitation Company — serving Kabwe, Kapiri Mposhi, Mkushi, Serenje, Mumbwa, Chibombo, Chisamba and surrounding districts.
+        Lukanga Water Supply &amp; Sanitation Company - serving Kabwe, Kapiri Mposhi, Mkushi, Serenje, Mumbwa, Chibombo, Chisamba and surrounding districts.
       </motion.p>
     </motion.div>
   );
